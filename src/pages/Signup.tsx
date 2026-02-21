@@ -46,7 +46,7 @@ const Signup = () => {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img
           src={authIllustration}
-          alt="SOLVR platform"
+          alt="Soluny platform"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent" />
@@ -57,7 +57,7 @@ const Signup = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 border border-primary/40">
                 <Zap className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-2xl font-bold text-gradient-gold">SOLVR</span>
+              <span className="text-2xl font-bold text-gradient-gold">Soluny</span>
             </div>
             <h2 className="text-3xl font-bold tracking-tight leading-tight">
               Join thousands earning with their <span className="text-gradient-gold">knowledge</span>.
@@ -89,7 +89,7 @@ const Signup = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
                 <Zap className="h-6 w-6 text-primary" />
               </div>
-              <span className="text-2xl font-bold text-gradient-gold">SOLVR</span>
+              <span className="text-2xl font-bold text-gradient-gold">Soluny</span>
             </Link>
           </div>
 
