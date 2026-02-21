@@ -76,7 +76,7 @@ const Dashboard = () => {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
               Welcome back, <span className="text-gradient-gold">{profile?.display_name || user?.user_metadata?.display_name || "Solver"}</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Here's your SOLVR overview</p>
+            <p className="text-sm text-muted-foreground mt-1">Here's your Soluny overview</p>
           </div>
           <Link to="/dashboard/questions/new">
             <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl">

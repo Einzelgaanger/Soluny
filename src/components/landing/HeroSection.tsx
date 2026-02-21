@@ -53,7 +53,7 @@ const HeroSection = () => {
 
           {/* Subheading */}
           <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto animate-slide-up stagger-1 px-4 sm:px-0">
-            SOLVR is the subscription-based community where your brainpower pays.
+            Soluny is the subscription-based community where your brainpower pays.
             Post challenges, submit solutions, get voted — and earn real money from the creator pool.
           </p>
 

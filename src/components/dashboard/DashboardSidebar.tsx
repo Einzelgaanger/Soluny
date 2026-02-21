@@ -44,7 +44,7 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
         <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
           <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
         </div>
-        {!collapsed && <span className="text-lg font-bold text-gradient-gold">SOLVR</span>}
+        {!collapsed && <span className="text-lg font-bold text-gradient-gold">Soluny</span>}
       </div>
 
       {/* Nav */}
