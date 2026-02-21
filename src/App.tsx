@@ -14,6 +14,7 @@ import QuestionDetail from "./pages/QuestionDetail";
 import Earnings from "./pages/Earnings";
 import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/dashboard/earnings" element={<Earnings />} />
             <Route path="/dashboard/leaderboard" element={<Leaderboard />} />
             <Route path="/dashboard/profile" element={<Profile />} />
+            <Route path="/dashboard/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
