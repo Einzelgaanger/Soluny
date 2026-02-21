@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Clock, MessageSquareText, ThumbsUp, Loader2 } from "lucide-react";
+import { Plus, Search, Clock, MessageSquareText, ThumbsUp, Loader2, Flame } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 type QuestionType = "problem" | "debate" | "opinion_poll" | "sponsored_challenge" | "knowledge_qa";
@@ -21,6 +21,7 @@ interface Question {
   view_count: number;
   created_at: string;
   author_id: string;
+  prize_pool_kes: number;
 }
 
 const typeColors: Record<string, string> = {
@@ -55,27 +56,27 @@ const Questions = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="space-y-5 sm:space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Questions</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Questions</h1>
             <p className="text-sm text-muted-foreground">Browse challenges and submit your solutions</p>
           </div>
           <Link to="/dashboard/questions/new">
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold">
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl">
               <Plus className="h-4 w-4 mr-2" /> Post Question
             </Button>
           </Link>
         </div>
 
         {/* Search */}
-        <div className="relative max-w-md">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search questions..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-background/50 border-border/60"
+            className="pl-10 h-11 bg-background/50 border-border/60 rounded-xl"
           />
         </div>
 
@@ -85,7 +86,7 @@ const Questions = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="glass-card rounded-xl p-12 text-center">
+          <div className="glass-card rounded-2xl p-12 text-center">
             <MessageSquareText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
             <p className="text-muted-foreground">No questions yet. Be the first to post one!</p>
           </div>
@@ -93,29 +94,34 @@ const Questions = () => {
           <div className="space-y-3">
             {filtered.map((q) => (
               <Link key={q.id} to={`/dashboard/questions/${q.id}`}>
-                <div className="glass-card glass-card-hover rounded-xl p-5 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-base font-semibold leading-snug">{q.title}</h3>
-                    <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wide border ${typeColors[q.type] || typeColors.knowledge_qa}`}>
+                <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 space-y-3">
+                  <div className="flex items-start justify-between gap-2 sm:gap-3">
+                    <h3 className="text-sm sm:text-base font-semibold leading-snug flex-1">{q.title}</h3>
+                    <span className={`shrink-0 inline-flex items-center px-2 sm:px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide border ${typeColors[q.type] || typeColors.knowledge_qa}`}>
                       {q.type.replace("_", " ")}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{q.body}</p>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{q.body}</p>
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <MessageSquareText className="h-3 w-3" /> {q.answer_count} answers
+                      <MessageSquareText className="h-3 w-3" /> {q.answer_count}
                     </span>
                     <span className="flex items-center gap-1">
-                      <ThumbsUp className="h-3 w-3" /> {q.view_count} views
+                      <ThumbsUp className="h-3 w-3" /> {q.view_count}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" /> {formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}
                     </span>
+                    {Number(q.prize_pool_kes) > 0 && (
+                      <span className="flex items-center gap-1 text-primary font-semibold">
+                        <Flame className="h-3 w-3" /> KES {Number(q.prize_pool_kes).toLocaleString()}
+                      </span>
+                    )}
                   </div>
                   {q.category_tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {q.category_tags.map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                        <span key={tag} className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-muted/50 text-muted-foreground">
                           {tag}
                         </span>
                       ))}
