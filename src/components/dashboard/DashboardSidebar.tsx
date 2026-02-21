@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -25,8 +24,12 @@ const navItems = [
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 
-const DashboardSidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
+interface Props {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
   const location = useLocation();
   const { signOut } = useAuth();
 
@@ -37,9 +40,9 @@ const DashboardSidebar = () => {
       }`}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 h-16 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/30">
-          <Zap className="h-5 w-5 text-primary" />
+      <div className="flex items-center gap-2 px-4 h-14 sm:h-16 border-b border-sidebar-border">
+        <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
+          <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
         </div>
         {!collapsed && <span className="text-lg font-bold text-gradient-gold">SOLVR</span>}
       </div>
@@ -87,7 +90,7 @@ const DashboardSidebar = () => {
           {!collapsed && "Sign Out"}
         </Button>
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={onToggle}
           className="flex items-center justify-center w-full p-2 rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
