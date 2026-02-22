@@ -17,25 +17,22 @@ import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import solunyLogo from "@/assets/soluny-logo.png";
+import { useUnreadCount } from "@/pages/Community";
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions" },
-  { icon: Users, label: "Community", path: "/dashboard/community" },
-  { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard" },
-  { icon: Wallet, label: "Earnings", path: "/dashboard/earnings" },
-  { icon: User, label: "Profile", path: "/dashboard/profile" },
-];
-
-interface Props {
-  collapsed: boolean;
-  onToggle: () => void;
-}
-
-const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
+const DashboardSidebar = ({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) => {
   const location = useLocation();
   const { signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const unreadCount = useUnreadCount();
+
+  const navItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", badge: 0 },
+    { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions", badge: 0 },
+    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount },
+    { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard", badge: 0 },
+    { icon: Wallet, label: "Earnings", path: "/dashboard/earnings", badge: 0 },
+    { icon: User, label: "Profile", path: "/dashboard/profile", badge: 0 },
+  ];
 
   return (
     <aside
@@ -51,18 +48,25 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
       {/* Nav */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const active = location.pathname === item.path;
+          const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
           const btn = (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative ${
                 active
                   ? "bg-gradient-to-r from-primary/20 to-primary/5 text-primary border-l-2 border-primary shadow-[inset_0_0_12px_rgba(245,189,65,0.06)]"
                   : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
               } ${collapsed ? "justify-center px-0" : ""}`}
             >
-              <item.icon className="h-5 w-5 shrink-0" />
+              <div className="relative">
+                <item.icon className="h-5 w-5 shrink-0" />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
+              </div>
               {!collapsed && <span>{item.label}</span>}
             </Link>
           );

@@ -80,7 +80,7 @@ const UserProfile = () => {
           {!isOwnProfile && user && (
             <Button
               size="sm"
-              onClick={() => navigate(`/dashboard/messages/${userId}`)}
+              onClick={() => navigate(`/dashboard/community/${userId}`)}
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 lg:h-10 text-xs lg:text-sm mt-2 lg:mt-0"
             >
               <Send className="h-3.5 w-3.5 mr-1" /> Message
