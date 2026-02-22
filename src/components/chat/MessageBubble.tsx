@@ -1,5 +1,5 @@
 import { Check, CheckCheck, FileText, Download, Play, Pause } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ChatAvatar from "./ChatAvatar";
 
 interface MessageBubbleProps {
@@ -22,20 +22,69 @@ const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  // Force load metadata on mount
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onCanPlay = () => {
+      setLoading(false);
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+    const onMeta = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+      setLoading(false);
+    };
+    const onError = () => {
+      console.error("[AudioPlayer] Failed to load:", url);
+      setError(true);
+      setLoading(false);
+    };
+    const onDurationChange = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    audio.addEventListener("canplaythrough", onCanPlay);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("durationchange", onDurationChange);
+    audio.addEventListener("error", onError);
+
+    // Trigger load
+    audio.load();
+
+    return () => {
+      audio.removeEventListener("canplaythrough", onCanPlay);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("durationchange", onDurationChange);
+      audio.removeEventListener("error", onError);
+    };
+  }, [url]);
+
   const toggle = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || error) return;
     if (playing) {
       audioRef.current.pause();
+      setPlaying(false);
     } else {
-      audioRef.current.play();
+      audioRef.current.play().then(() => setPlaying(true)).catch((e) => {
+        console.error("[AudioPlayer] play() failed:", e);
+        setError(true);
+      });
     }
-    setPlaying(!playing);
   };
 
   const formatTime = (s: number) => {
-    if (!s || isNaN(s)) return "0:00";
+    if (!s || isNaN(s) || !isFinite(s)) return "0:00";
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
   };
 
@@ -49,17 +98,29 @@ const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
     setProgress(pct * duration);
   };
 
+  if (error) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`flex items-center gap-2 text-xs ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+      >
+        <Play className="h-4 w-4" />
+        <span>Voice note (tap to download)</span>
+        <Download className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2.5 min-w-[200px] max-w-[260px]">
       <audio
         ref={audioRef}
         src={url}
-        preload="metadata"
+        preload="auto"
         onTimeUpdate={() => {
           if (audioRef.current) setProgress(audioRef.current.currentTime);
-        }}
-        onLoadedMetadata={() => {
-          if (audioRef.current) setDuration(audioRef.current.duration);
         }}
         onEnded={() => {
           setPlaying(false);
@@ -68,7 +129,9 @@ const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
       />
       <button
         onClick={toggle}
+        disabled={loading}
         className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+          loading ? "opacity-50" :
           isMe
             ? "bg-primary-foreground/20 hover:bg-primary-foreground/30"
             : "bg-primary/15 hover:bg-primary/25"
@@ -106,9 +169,11 @@ const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
           <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
             {playing ? formatTime(progress) : formatTime(duration)}
           </span>
-          <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
-            {formatTime(duration)}
-          </span>
+          {duration > 0 && (
+            <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
+              {formatTime(duration)}
+            </span>
+          )}
         </div>
       </div>
     </div>
