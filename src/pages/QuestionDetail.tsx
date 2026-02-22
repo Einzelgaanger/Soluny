@@ -58,6 +58,8 @@ const QuestionDetail = () => {
   useEffect(() => {
     if (!id) return;
     const load = async () => {
+      // Increment view count
+      try { await supabase.rpc("increment_view_count", { question_id: id }); } catch {}
       const [qRes, aRes] = await Promise.all([
         supabase.from("questions").select("*").eq("id", id).single(),
         supabase.from("answers").select("*").eq("question_id", id).order("net_score", { ascending: false }),

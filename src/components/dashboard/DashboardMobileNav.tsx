@@ -5,7 +5,6 @@ import {
   Trophy,
   Wallet,
   User,
-  Settings,
 } from "lucide-react";
 
 const navItems = [
@@ -14,7 +13,6 @@ const navItems = [
   { icon: Trophy, label: "Ranks", path: "/dashboard/leaderboard" },
   { icon: Wallet, label: "Earn", path: "/dashboard/earnings" },
   { icon: User, label: "Profile", path: "/dashboard/profile" },
-  { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 
 const DashboardMobileNav = () => {
@@ -30,9 +28,7 @@ const DashboardMobileNav = () => {
               key={item.path}
               to={item.path}
               className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all min-w-[48px] ${
-                active
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                active ? "text-primary" : "text-muted-foreground"
               }`}
             >
               <div className="relative">

@@ -128,12 +128,17 @@ const Login = () => {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-primary hover:underline font-semibold">
-              Create one free
+          <div className="text-center space-y-2">
+            <Link to="/forgot-password" className="text-sm text-primary hover:underline font-semibold">
+              Forgot your password?
             </Link>
-          </p>
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link to="/signup" className="text-primary hover:underline font-semibold">
+                Create one free
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
