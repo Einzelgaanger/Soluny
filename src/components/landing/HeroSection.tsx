@@ -3,12 +3,12 @@ import { ArrowRight, TrendingUp, Users, Coins, Sparkles, Trophy, Flame, Swords, 
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import heroBg from "@/assets/hero-bg-new.jpg";
-import mouseImg from "@/assets/ranks/mouse-hero.png";
-import foxImg from "@/assets/ranks/fox-hero.png";
-import wolfImg from "@/assets/ranks/wolf-hero.png";
-import eagleImg from "@/assets/ranks/eagle-hero.png";
-import lionImg from "@/assets/ranks/lion-hero.png";
-import dragonImg from "@/assets/ranks/dragon-hero.png";
+import mouseImg from "@/assets/ranks/mouse.png";
+import foxImg from "@/assets/ranks/fox.png";
+import wolfImg from "@/assets/ranks/wolf.png";
+import eagleImg from "@/assets/ranks/eagle.png";
+import lionImg from "@/assets/ranks/lion.png";
+import dragonImg from "@/assets/ranks/dragon.png";
 
 const ranks = [
   { name: "Mouse", img: mouseImg, cp: "0+", glow: "from-blue-400/20 to-blue-600/5" },
