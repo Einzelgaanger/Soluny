@@ -15,7 +15,10 @@ const ReadReceipt = ({ read }: { read: boolean }) => {
   return <Check className="h-3 w-3 text-muted-foreground/40 inline-block" />;
 };
 
-const AudioPlayer = ({ url }: { url: string }) => {
+// Fake waveform bars for visual effect
+const WAVEFORM_BARS = [3, 5, 8, 4, 7, 10, 6, 9, 5, 3, 7, 11, 8, 4, 6, 9, 5, 7, 3, 8, 10, 6, 4, 7, 5, 9, 3, 6, 8, 4];
+
+const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -36,11 +39,22 @@ const AudioPlayer = ({ url }: { url: string }) => {
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
   };
 
+  const progressPct = duration ? (progress / duration) * 100 : 0;
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audioRef.current.currentTime = pct * duration;
+    setProgress(pct * duration);
+  };
+
   return (
-    <div className="flex items-center gap-2 min-w-[180px]">
+    <div className="flex items-center gap-2.5 min-w-[200px] max-w-[260px]">
       <audio
         ref={audioRef}
         src={url}
+        preload="metadata"
         onTimeUpdate={() => {
           if (audioRef.current) setProgress(audioRef.current.currentTime);
         }}
@@ -54,20 +68,48 @@ const AudioPlayer = ({ url }: { url: string }) => {
       />
       <button
         onClick={toggle}
-        className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 hover:bg-primary/30 transition-colors"
+        className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+          isMe
+            ? "bg-primary-foreground/20 hover:bg-primary-foreground/30"
+            : "bg-primary/15 hover:bg-primary/25"
+        }`}
       >
-        {playing ? <Pause className="h-3.5 w-3.5 text-primary" /> : <Play className="h-3.5 w-3.5 text-primary ml-0.5" />}
+        {playing ? (
+          <Pause className={`h-4 w-4 ${isMe ? "text-primary-foreground" : "text-primary"}`} />
+        ) : (
+          <Play className={`h-4 w-4 ml-0.5 ${isMe ? "text-primary-foreground" : "text-primary"}`} />
+        )}
       </button>
       <div className="flex-1 min-w-0">
-        <div className="h-1 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all"
-            style={{ width: duration ? `${(progress / duration) * 100}%` : "0%" }}
-          />
+        {/* Waveform visualization */}
+        <div
+          className="flex items-end gap-[2px] h-6 cursor-pointer"
+          onClick={handleSeek}
+        >
+          {WAVEFORM_BARS.map((h, i) => {
+            const barPct = (i / WAVEFORM_BARS.length) * 100;
+            const isPlayed = barPct < progressPct;
+            return (
+              <div
+                key={i}
+                className={`w-[3px] rounded-full transition-all duration-150 ${
+                  isPlayed
+                    ? isMe ? "bg-primary-foreground/80" : "bg-primary"
+                    : isMe ? "bg-primary-foreground/25" : "bg-muted-foreground/25"
+                }`}
+                style={{ height: `${h * 2}px` }}
+              />
+            );
+          })}
         </div>
-        <span className="text-[9px] text-muted-foreground font-mono mt-0.5 block">
-          {playing ? formatTime(progress) : formatTime(duration)}
-        </span>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
+            {playing ? formatTime(progress) : formatTime(duration)}
+          </span>
+          <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
+            {formatTime(duration)}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -78,7 +120,7 @@ const AttachmentContent = ({ message, isMe }: { message: any; isMe: boolean }) =
   const type = message.attachment_type || "";
 
   if (type === "voice") {
-    return <AudioPlayer url={message.attachment_url} />;
+    return <AudioPlayer url={message.attachment_url} isMe={isMe} />;
   }
 
   if (type.startsWith("image") || type === "image") {
