@@ -2,18 +2,10 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, MessageSquareText, Coins, Award, ArrowUpRight, Flame, Loader2 } from "lucide-react";
+import { TrendingUp, MessageSquareText, Coins, ArrowUpRight, Flame, Loader2, Wallet, Crown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-
-const rankConfig: Record<string, { color: string; next: string; cpNeeded: number }> = {
-  newcomer: { color: "text-muted-foreground", next: "Contributor", cpNeeded: 100 },
-  contributor: { color: "text-info", next: "Analyst", cpNeeded: 500 },
-  analyst: { color: "text-success", next: "Scholar", cpNeeded: 1500 },
-  scholar: { color: "text-primary", next: "Sage", cpNeeded: 5000 },
-  sage: { color: "text-warning", next: "Grand Master", cpNeeded: 15000 },
-  grand_master: { color: "text-primary", next: "MAX", cpNeeded: 99999 },
-};
+import { getRankConfig, getRankProgress, getSubTier } from "@/lib/ranks";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -36,122 +28,129 @@ const Dashboard = () => {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       </DashboardLayout>
     );
   }
 
-  const rank = profile?.rank || "newcomer";
+  const rank = getRankConfig(profile?.rank || "newcomer");
   const cp = profile?.cp_balance || 0;
-  const config = rankConfig[rank] || rankConfig.newcomer;
-  const cpProgress = Math.min((cp / config.cpNeeded) * 100, 100);
-
-  const stats = [
-    {
-      label: "Total Earnings",
-      value: `KES ${Number(profile?.total_earnings_kes || 0).toLocaleString()}`,
-      icon: Coins,
-      glow: "",
-    },
-    {
-      label: "CP Balance",
-      value: `${cp} CP`,
-      icon: Award,
-      glow: "glow-variant-info",
-    },
-    {
-      label: "Available",
-      value: `KES ${Number(profile?.available_balance_kes || 0).toLocaleString()}`,
-      icon: TrendingUp,
-      glow: "glow-variant-success",
-    },
-  ];
+  const cpProgress = getRankProgress(profile?.rank || "newcomer", cp);
+  const sub = getSubTier(profile?.subscription_plan || "free");
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 sm:space-y-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-4 animate-fade-in">
+        {/* Welcome header */}
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              Welcome back, <span className="text-gradient-gold">{profile?.display_name || user?.user_metadata?.display_name || "Solver"}</span>
+            <h1 className="text-lg font-bold tracking-tight">
+              Welcome, <span className="text-gradient-gold">{profile?.display_name || "Solver"}</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Here's your Soluny overview</p>
+            <p className="text-[11px] text-muted-foreground">Your Soluny command center</p>
           </div>
           <Link to="/dashboard/questions/new">
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl">
-              <Flame className="h-4 w-4 mr-2" /> Post Challenge
+            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs px-3">
+              <Flame className="h-3.5 w-3.5 mr-1" /> Post
             </Button>
           </Link>
         </div>
 
-        {/* Rank progress card */}
-        <div className="glass-card gradient-border rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-                <Award className={`h-6 w-6 ${config.color}`} />
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Rank</div>
-                <div className={`text-lg font-bold capitalize ${config.color}`}>{rank.replace("_", " ")}</div>
-              </div>
+        {/* Rank card with animal image */}
+        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
+          <img src={rank.image} alt={rank.label} className="h-16 w-16 rounded-xl object-cover border-2 border-border/40" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-sm font-bold ${rank.color}`}>{rank.animal} {rank.label}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-mono">{cp} CP</span>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground">Next: {config.next}</div>
-              <div className="text-sm font-mono font-bold">{cp}/{config.cpNeeded} CP</div>
+            {/* XP bar */}
+            <div className="h-2 rounded-full bg-secondary/50 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700"
+                style={{ width: `${cpProgress}%` }}
+              />
             </div>
-          </div>
-          {/* XP bar */}
-          <div className="h-3 rounded-full bg-muted/50 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-1000 ease-out"
-              style={{ width: `${cpProgress}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-2 text-[10px] text-muted-foreground uppercase tracking-wider">
-            <span>{rank.replace("_", " ")}</span>
-            <span>{config.next}</span>
+            <div className="flex justify-between mt-0.5 text-[9px] text-muted-foreground">
+              <span>{rank.label}</span>
+              <span>{rank.nextRank}</span>
+            </div>
           </div>
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          {stats.map((s) => (
-            <div key={s.label} className={`glass-card glass-card-hover stat-card-glow ${s.glow} rounded-2xl p-4 sm:p-5 space-y-2 sm:space-y-3`}>
+        {/* Stats grid - compact */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Balance", value: `KES ${Number(profile?.available_balance_kes || 0).toLocaleString()}`, icon: Wallet, glow: "" },
+            { label: "Earned", value: `KES ${Number(profile?.total_earnings_kes || 0).toLocaleString()}`, icon: Coins, glow: "glow-variant-success" },
+            { label: "Plan", value: `${sub.icon} ${sub.name}`, icon: Crown, glow: "glow-variant-info" },
+          ].map((s) => (
+            <div key={s.label} className={`glass-card stat-card-glow ${s.glow} rounded-xl p-3 space-y-1`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">{s.label}</span>
-                <s.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{s.label}</span>
+                <s.icon className="h-3 w-3 text-muted-foreground" />
               </div>
-              <div className="text-xl sm:text-3xl font-bold font-mono tracking-tight">{s.value}</div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-success">
-                <ArrowUpRight className="h-3 w-3" />
-                <span>Active</span>
-              </div>
+              <div className="text-sm font-bold font-mono">{s.value}</div>
             </div>
           ))}
         </div>
 
+        {/* Subscription limits info */}
+        <div className="glass-card rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Your Limits</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+            <div className="bg-secondary/30 rounded-lg p-2 text-center">
+              <div className="font-mono font-bold">{sub.limits.dailyAnswers}</div>
+              <div className="text-muted-foreground">Answers/day</div>
+            </div>
+            <div className="bg-secondary/30 rounded-lg p-2 text-center">
+              <div className="font-mono font-bold">{sub.limits.platformFee}%</div>
+              <div className="text-muted-foreground">Platform fee</div>
+            </div>
+            <div className="bg-secondary/30 rounded-lg p-2 text-center">
+              <div className="font-mono font-bold">KES {sub.limits.maxWithdrawal.toLocaleString()}</div>
+              <div className="text-muted-foreground">Max withdraw</div>
+            </div>
+            <div className="bg-secondary/30 rounded-lg p-2 text-center">
+              <div className="font-mono font-bold">{sub.limits.questionsPerMonth >= 999 ? "∞" : sub.limits.questionsPerMonth}</div>
+              <div className="text-muted-foreground">Questions/mo</div>
+            </div>
+          </div>
+        </div>
+
         {/* Quick actions */}
-        <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
-          <Link to="/dashboard/questions" className="glass-card glass-card-hover rounded-2xl p-5 sm:p-6 flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-info/10 border border-info/20">
-              <MessageSquareText className="h-6 w-6 text-info" />
-            </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Link to="/dashboard/questions" className="glass-card glass-card-hover rounded-xl p-3 flex items-center gap-3">
+            <MessageSquareText className="h-5 w-5 text-info shrink-0" />
             <div>
-              <div className="font-bold">Browse Questions</div>
-              <div className="text-sm text-muted-foreground">Find challenges to solve and earn</div>
+              <div className="text-xs font-bold">Questions</div>
+              <div className="text-[10px] text-muted-foreground">Solve & earn</div>
             </div>
           </Link>
-          <Link to="/dashboard/leaderboard" className="glass-card glass-card-hover rounded-2xl p-5 sm:p-6 flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-              <Award className="h-6 w-6 text-primary" />
-            </div>
+          <Link to="/dashboard/leaderboard" className="glass-card glass-card-hover rounded-xl p-3 flex items-center gap-3">
+            <TrendingUp className="h-5 w-5 text-primary shrink-0" />
             <div>
-              <div className="font-bold">Leaderboard</div>
-              <div className="text-sm text-muted-foreground">See where you rank this month</div>
+              <div className="text-xs font-bold">Leaderboard</div>
+              <div className="text-[10px] text-muted-foreground">Your ranking</div>
             </div>
           </Link>
+        </div>
+
+        {/* Rank progression preview */}
+        <div className="glass-card rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Rank Progression</div>
+          <div className="flex items-center justify-between gap-1 overflow-x-auto pb-1">
+            {["newcomer", "contributor", "analyst", "scholar", "sage", "grand_master"].map((key) => {
+              const r = getRankConfig(key);
+              const isActive = key === (profile?.rank || "newcomer");
+              return (
+                <div key={key} className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg min-w-[52px] ${isActive ? "bg-primary/10 border border-primary/30" : ""}`}>
+                  <img src={r.image} alt={r.label} className={`h-8 w-8 rounded-lg object-cover ${isActive ? "" : "opacity-40 grayscale"}`} />
+                  <span className={`text-[8px] font-bold ${isActive ? r.color : "text-muted-foreground"}`}>{r.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </DashboardLayout>
