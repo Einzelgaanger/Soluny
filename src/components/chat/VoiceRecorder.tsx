@@ -17,7 +17,13 @@ const VoiceRecorder = ({ onRecorded, disabled }: VoiceRecorderProps) => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      // Pick a supported mime type
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -26,18 +32,19 @@ const VoiceRecorder = ({ onRecorded, disabled }: VoiceRecorderProps) => {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         onRecorded(blob);
         stream.getTracks().forEach((t) => t.stop());
         setDuration(0);
       };
 
-      mediaRecorder.start();
+      // Use timeslice to collect data every 250ms for reliability
+      mediaRecorder.start(250);
       setRecording(true);
       setDuration(0);
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
-    } catch {
-      console.error("Microphone access denied");
+    } catch (err) {
+      console.error("Microphone access denied", err);
     }
   };
 
