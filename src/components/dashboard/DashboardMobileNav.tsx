@@ -6,23 +6,25 @@ import {
   Wallet,
   User,
 } from "lucide-react";
-
-const navItems = [
-  { icon: LayoutDashboard, label: "Home", path: "/dashboard" },
-  { icon: MessageSquareText, label: "Q&A", path: "/dashboard/questions" },
-  { icon: Users, label: "Community", path: "/dashboard/community" },
-  { icon: Wallet, label: "Earn", path: "/dashboard/earnings" },
-  { icon: User, label: "Me", path: "/dashboard/profile" },
-];
+import { useUnreadCount } from "@/pages/Community";
 
 const DashboardMobileNav = () => {
   const location = useLocation();
+  const unreadCount = useUnreadCount();
+
+  const navItems = [
+    { icon: LayoutDashboard, label: "Home", path: "/dashboard", badge: 0 },
+    { icon: MessageSquareText, label: "Q&A", path: "/dashboard/questions", badge: 0 },
+    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount },
+    { icon: Wallet, label: "Earn", path: "/dashboard/earnings", badge: 0 },
+    { icon: User, label: "Me", path: "/dashboard/profile", badge: 0 },
+  ];
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/95 backdrop-blur-xl safe-area-bottom">
       <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
-          const active = location.pathname === item.path;
+          const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
           return (
             <Link
               key={item.path}
@@ -33,7 +35,12 @@ const DashboardMobileNav = () => {
             >
               <div className="relative">
                 <item.icon className={`h-5 w-5 ${active ? "drop-shadow-[0_0_6px_rgba(245,189,65,0.5)]" : ""}`} />
-                {active && (
+                {item.badge > 0 && (
+                  <span className="absolute -top-1 -right-2 h-3.5 min-w-[14px] px-0.5 rounded-full bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
+                {active && !item.badge && (
                   <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
                 )}
               </div>

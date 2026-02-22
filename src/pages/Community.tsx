@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Loader2, Search, User, Users, Send, ArrowLeft,
-  MessageSquare, Bell, Check, CheckCheck, Circle,
+  MessageSquare, Check, CheckCheck, Trophy, Coins, MessageSquareText,
 } from "lucide-react";
 import { getRankConfig } from "@/lib/ranks";
 import { formatDistanceToNow } from "date-fns";
@@ -24,18 +24,8 @@ interface Conversation {
   unread: number;
 }
 
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  link: string | null;
-  read: boolean;
-  created_at: string;
-}
-
 // ─── Online Status Hook ──────────────────────────────
-const useUpdateLastSeen = () => {
+export const useUpdateLastSeen = () => {
   const { user } = useAuth();
   useEffect(() => {
     if (!user) return;
@@ -48,13 +38,41 @@ const useUpdateLastSeen = () => {
 
 const isOnline = (lastSeen: string | null) => {
   if (!lastSeen) return false;
-  return Date.now() - new Date(lastSeen).getTime() < 120000; // 2 min
+  return Date.now() - new Date(lastSeen).getTime() < 120000;
+};
+
+// ─── Unread count hook (exported for sidebar badge) ───
+export const useUnreadCount = () => {
+  const { user } = useAuth();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { count: c } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .eq("receiver_id", user.id)
+        .eq("read", false);
+      setCount(c || 0);
+    };
+    load();
+
+    const channel = supabase
+      .channel(`unread-badge-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `receiver_id=eq.${user.id}` }, () => load())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  return count;
 };
 
 // ─── Avatar with online dot ──────────────────────────
-const AvatarWithStatus = ({ url, name, online, size = "md" }: { url?: string | null; name?: string; online?: boolean; size?: "sm" | "md" | "lg" }) => {
-  const sizes = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12" };
-  const dotSizes = { sm: "h-2 w-2", md: "h-2.5 w-2.5", lg: "h-3 w-3" };
+const AvatarWithStatus = ({ url, name, online, size = "md" }: { url?: string | null; name?: string; online?: boolean; size?: "sm" | "md" | "lg" | "xl" }) => {
+  const sizes = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12", xl: "h-16 w-16" };
+  const dotSizes = { sm: "h-2 w-2", md: "h-2.5 w-2.5", lg: "h-3 w-3", xl: "h-3.5 w-3.5" };
   return (
     <div className="relative shrink-0">
       <div className={`${sizes[size]} rounded-xl bg-secondary overflow-hidden`}>
@@ -92,7 +110,7 @@ const ReadReceipt = ({ sent, read }: { sent: boolean; read: boolean }) => {
 };
 
 // ─── People Tab ────────────────────────────────────────
-const PeopleTab = ({ isMobile }: { isMobile: boolean }) => {
+const PeopleTab = ({ isMobile, onViewProfile }: { isMobile: boolean; onViewProfile?: (id: string) => void }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -124,6 +142,12 @@ const PeopleTab = ({ isMobile }: { isMobile: boolean }) => {
   };
 
   const displayList = results.length > 0 ? results : topUsers;
+
+  const handleClick = (userId: string) => {
+    if (onViewProfile) {
+      onViewProfile(userId);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -158,12 +182,8 @@ const PeopleTab = ({ isMobile }: { isMobile: boolean }) => {
           {displayList.map((p: any) => {
             const rank = getRankConfig(p.rank || "newcomer");
             const online = isOnline(p.last_seen);
-            return (
-              <Link
-                key={p.user_id}
-                to={`/dashboard/user/${p.user_id}`}
-                className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/5 rounded-lg transition-colors"
-              >
+            const content = (
+              <div className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/5 rounded-lg transition-colors cursor-pointer">
                 <AvatarWithStatus url={p.avatar_url} name={p.display_name} online={online} size={isMobile ? "sm" : "md"} />
                 <img src={rank.image} alt="" className="h-5 w-5 rounded object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -177,6 +197,20 @@ const PeopleTab = ({ isMobile }: { isMobile: boolean }) => {
                     {online && <span className="text-success text-[9px]">● online</span>}
                   </div>
                 </div>
+              </div>
+            );
+
+            if (onViewProfile) {
+              return (
+                <button key={p.user_id} onClick={() => handleClick(p.user_id)} className="w-full text-left">
+                  {content}
+                </button>
+              );
+            }
+
+            return (
+              <Link key={p.user_id} to={`/dashboard/user/${p.user_id}`}>
+                {content}
               </Link>
             );
           })}
@@ -186,8 +220,132 @@ const PeopleTab = ({ isMobile }: { isMobile: boolean }) => {
   );
 };
 
+// ─── Inline Profile Panel (desktop) ───────────────────
+const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessage: (id: string) => void; onClose: () => void }) => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [profRes, qRes, aRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", userId).single(),
+        supabase.from("questions").select("id, title, created_at, answer_count").eq("author_id", userId).order("created_at", { ascending: false }).limit(5),
+        supabase.from("answers").select("id, body, net_score, upvotes, created_at, question_id, earnings_awarded_kes").eq("author_id", userId).order("created_at", { ascending: false }).limit(5),
+      ]);
+      setProfile(profRes.data);
+      setQuestions(qRes.data || []);
+      setAnswers(aRes.data || []);
+      setLoading(false);
+    };
+    load();
+  }, [userId]);
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+  if (!profile) return <div className="text-center py-16 text-muted-foreground text-sm">User not found</div>;
+
+  const rank = getRankConfig(profile.rank || "newcomer");
+  const online = isOnline(profile.last_seen);
+  const isOwnProfile = user?.id === userId;
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <Link to={`/dashboard/user/${userId}`} className="text-[10px] text-muted-foreground hover:text-primary transition-colors">
+          Full profile →
+        </Link>
+      </div>
+
+      {/* Header */}
+      <div className="flex flex-col items-center text-center gap-3">
+        <AvatarWithStatus url={profile.avatar_url} name={profile.display_name} online={online} size="xl" />
+        <div>
+          <h2 className="text-base font-bold">{profile.display_name || "Anonymous"}</h2>
+          {profile.username && <p className="text-xs text-muted-foreground">@{profile.username}</p>}
+          <div className="flex items-center justify-center gap-2 mt-1.5">
+            <img src={rank.image} alt={rank.label} className="h-5 w-5 rounded object-cover" />
+            <span className={`text-xs font-bold ${rank.color}`}>{rank.label}</span>
+            <span className="text-[10px] font-mono text-muted-foreground">{profile.cp_balance} CP</span>
+          </div>
+          {profile.bio && <p className="text-xs text-muted-foreground mt-2 max-w-xs mx-auto">{profile.bio}</p>}
+        </div>
+        {!isOwnProfile && user && (
+          <Button
+            size="sm"
+            onClick={() => onMessage(userId)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl h-8 text-xs gap-1.5"
+          >
+            <Send className="h-3.5 w-3.5" /> Send Message
+          </Button>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl bg-secondary/30 p-2.5 text-center">
+          <MessageSquareText className="h-3.5 w-3.5 mx-auto mb-0.5 text-muted-foreground" />
+          <div className="text-sm font-bold font-mono">{questions.length}</div>
+          <div className="text-[9px] text-muted-foreground">Questions</div>
+        </div>
+        <div className="rounded-xl bg-secondary/30 p-2.5 text-center">
+          <Trophy className="h-3.5 w-3.5 mx-auto mb-0.5 text-muted-foreground" />
+          <div className="text-sm font-bold font-mono">{answers.length}</div>
+          <div className="text-[9px] text-muted-foreground">Answers</div>
+        </div>
+        <div className="rounded-xl bg-secondary/30 p-2.5 text-center">
+          <Coins className="h-3.5 w-3.5 mx-auto mb-0.5 text-muted-foreground" />
+          <div className="text-sm font-bold font-mono text-[11px]">KES {Number(profile.total_earnings_kes || 0).toLocaleString()}</div>
+          <div className="text-[9px] text-muted-foreground">Earned</div>
+        </div>
+      </div>
+
+      {/* Recent activity */}
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Recent Questions</h3>
+        {questions.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2 text-center">None yet</p>
+        ) : (
+          <div className="space-y-1">
+            {questions.map((q) => (
+              <Link key={q.id} to={`/dashboard/questions/${q.id}`} className="block py-1.5 px-2 hover:bg-muted/5 rounded-lg transition-colors">
+                <p className="text-xs font-medium line-clamp-1 hover:text-primary transition-colors">{q.title}</p>
+                <span className="text-[9px] text-muted-foreground">{q.answer_count} answers · {formatDistanceToNow(new Date(q.created_at), { addSuffix: true })}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Recent Answers</h3>
+        {answers.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2 text-center">None yet</p>
+        ) : (
+          <div className="space-y-1">
+            {answers.map((a) => (
+              <Link key={a.id} to={`/dashboard/questions/${a.question_id}`} className="block py-1.5 px-2 hover:bg-muted/5 rounded-lg transition-colors">
+                <p className="text-xs line-clamp-1">{a.body}</p>
+                <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                  <span>▲ {a.upvotes}</span>
+                  {Number(a.earnings_awarded_kes) > 0 && <span className="text-primary font-bold">+KES {Number(a.earnings_awarded_kes).toLocaleString()}</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── Chat View (DM with a specific user) ──────────────
-const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBack: () => void; compact?: boolean }) => {
+const ChatView = ({ recipientId, onBack, embedded }: { recipientId: string; onBack: () => void; embedded?: boolean }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [messages, setMessages] = useState<any[]>([]);
@@ -216,7 +374,6 @@ const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBac
     };
     loadChat();
 
-    // Realtime messages
     const channel = supabase
       .channel(`dm-${recipientId}-${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
@@ -237,7 +394,6 @@ const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBac
       })
       .subscribe();
 
-    // Typing presence
     const presenceChannel = supabase.channel(`typing-${[user.id, recipientId].sort().join("-")}`);
     presenceChannel
       .on("presence", { event: "sync" }, () => {
@@ -263,7 +419,6 @@ const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBac
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Broadcast typing status
   const broadcastTyping = useCallback(() => {
     if (!user) return;
     const channelName = `typing-${[user.id, recipientId].sort().join("-")}`;
@@ -281,26 +436,24 @@ const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBac
     await supabase.from("messages").insert({ sender_id: user.id, receiver_id: recipientId, body: newMsg.trim() });
     setNewMsg("");
     setSending(false);
-    // Stop typing
     const channelName = `typing-${[user.id, recipientId].sort().join("-")}`;
     supabase.channel(channelName).track({ user_id: user.id, typing: false });
   };
 
   const online = recipientProfile ? isOnline(recipientProfile.last_seen) : false;
-  const containerH = compact ? "h-[calc(100vh-14rem)]" : isMobile ? "h-[calc(100vh-10rem)]" : "h-[calc(100vh-12rem)]";
 
   return (
-    <div className={`flex flex-col ${containerH}`}>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 pb-2.5 border-b border-border/30">
+      <div className={`flex items-center gap-3 ${embedded ? "pb-3" : "pb-2.5"} border-b border-border/30 shrink-0`}>
         <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" />
         </button>
         {recipientProfile && (
-          <Link to={`/dashboard/user/${recipientId}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link to={`/dashboard/user/${recipientId}`} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity flex-1 min-w-0">
             <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} online={online} size={isMobile ? "sm" : "md"} />
-            <div>
-              <div className="text-sm font-semibold">{recipientProfile.display_name || "Anonymous"}</div>
+            <div className="min-w-0">
+              <div className={`${isMobile ? "text-sm" : "text-sm"} font-semibold truncate`}>{recipientProfile.display_name || "Anonymous"}</div>
               <div className="text-[10px] text-muted-foreground">
                 {recipientProfile.username && `@${recipientProfile.username} · `}
                 {online ? <span className="text-success">Active now</span> : "Offline"}
@@ -311,7 +464,7 @@ const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBac
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-3 space-y-1.5">
+      <div className="flex-1 overflow-y-auto py-3 space-y-1.5 min-h-0">
         {messages.length === 0 && (
           <div className="text-center py-10 text-muted-foreground text-xs">
             <MessageSquare className="h-6 w-6 mx-auto mb-2 opacity-20" />
@@ -349,7 +502,7 @@ const ChatView = ({ recipientId, onBack, compact }: { recipientId: string; onBac
       </div>
 
       {/* Input */}
-      <div className="flex items-center gap-2 pt-2.5 border-t border-border/30">
+      <div className={`flex items-center gap-2 pt-2.5 border-t border-border/30 shrink-0 ${isMobile ? "pb-2" : ""}`}>
         <Input
           value={newMsg}
           onChange={(e) => {
@@ -493,108 +646,6 @@ const MessagesTab = ({ isMobile, onOpenChat }: { isMobile: boolean; onOpenChat: 
   );
 };
 
-// ─── Notifications Panel ──────────────────────────────
-const NotificationsPanel = ({ compact }: { compact?: boolean }) => {
-  const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(30)
-      .then(({ data }) => {
-        setNotifications((data as Notification[]) || []);
-        setLoading(false);
-      });
-
-    // Realtime
-    const channel = supabase
-      .channel(`notif-${user.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
-        setNotifications((prev) => [payload.new as Notification, ...prev]);
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  const markRead = async (id: string) => {
-    await supabase.from("notifications").update({ read: true }).eq("id", id);
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
-  };
-
-  const markAllRead = async () => {
-    if (!user) return;
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const typeIcon = (type: string) => {
-    switch (type) {
-      case "earning": return "💰";
-      case "rank_change": return "🏆";
-      case "new_answer": return "💬";
-      case "new_message": return "📩";
-      default: return "🔔";
-    }
-  };
-
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
-
-  return (
-    <div className="space-y-2">
-      {unreadCount > 0 && (
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-primary">{unreadCount} new</span>
-          <button onClick={markAllRead} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
-            Mark all read
-          </button>
-        </div>
-      )}
-      {notifications.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground text-xs">
-          <Bell className="h-6 w-6 mx-auto mb-2 opacity-20" />
-          No notifications yet.
-        </div>
-      ) : (
-        <div className="space-y-1">
-          {notifications.map((n) => (
-            <button
-              key={n.id}
-              onClick={() => {
-                markRead(n.id);
-                if (n.link) navigate(n.link);
-              }}
-              className={`w-full text-left p-2 rounded-lg transition-colors ${
-                n.read ? "opacity-60 hover:bg-muted/5" : "bg-primary/5 hover:bg-primary/10 border-l-2 border-primary"
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <span className="text-sm mt-0.5">{typeIcon(n.type)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold truncate">{n.title}</div>
-                  <div className="text-[10px] text-muted-foreground line-clamp-2">{n.body}</div>
-                  <div className="text-[9px] text-muted-foreground/50 mt-0.5">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                  </div>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Main Community Page ──────────────────────────────
 const Community = () => {
   const { recipientId } = useParams<{ recipientId: string }>();
@@ -602,18 +653,21 @@ const Community = () => {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(recipientId ? "messages" : "people");
   const [chatUserId, setChatUserId] = useState<string | null>(recipientId || null);
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
 
   useUpdateLastSeen();
 
   useEffect(() => {
     if (recipientId) {
       setChatUserId(recipientId);
+      setViewingProfileId(null);
       setActiveTab("messages");
     }
   }, [recipientId]);
 
   const openChat = (userId: string) => {
     setChatUserId(userId);
+    setViewingProfileId(null);
     navigate(`/dashboard/community/${userId}`, { replace: true });
   };
 
@@ -622,87 +676,103 @@ const Community = () => {
     navigate("/dashboard/community", { replace: true });
   };
 
-  // ── Chat view (both mobile and desktop) ──
-  if (chatUserId) {
-    return (
-      <DashboardLayout>
-        <div className={`${isMobile ? "" : "max-w-3xl"} mx-auto animate-fade-in`}>
-          <ChatView recipientId={chatUserId} onBack={closeChat} />
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const viewProfile = (userId: string) => {
+    setViewingProfileId(userId);
+    setChatUserId(null);
+  };
 
-  // ── Desktop: 3-panel layout ──
-  if (!isMobile) {
-    return (
-      <DashboardLayout>
-        <div className="animate-fade-in">
-          <h1 className="text-xl font-bold tracking-tight mb-4">Community</h1>
-          <div className="grid grid-cols-12 gap-4" style={{ height: "calc(100vh - 9rem)" }}>
-            {/* People panel */}
-            <div className="col-span-5 glass-card rounded-2xl p-4 overflow-y-auto flex flex-col">
-              <div className="flex items-center gap-2 mb-3 shrink-0">
-                <Users className="h-4 w-4 text-primary" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">People</h2>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <PeopleTab isMobile={false} />
-              </div>
-            </div>
-            {/* Messages panel */}
-            <div className="col-span-4 glass-card rounded-2xl p-4 overflow-y-auto flex flex-col">
-              <div className="flex items-center gap-2 mb-3 shrink-0">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Messages</h2>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <MessagesTab isMobile={false} onOpenChat={openChat} />
-              </div>
-            </div>
-            {/* Notifications panel */}
-            <div className="col-span-3 glass-card rounded-2xl p-4 overflow-y-auto flex flex-col">
-              <div className="flex items-center gap-2 mb-3 shrink-0">
-                <Bell className="h-4 w-4 text-primary" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notifications</h2>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <NotificationsPanel compact />
-              </div>
-            </div>
+  const closeProfile = () => {
+    setViewingProfileId(null);
+  };
+
+  // ── MOBILE ──
+  if (isMobile) {
+    // Full-screen chat on mobile
+    if (chatUserId) {
+      return (
+        <DashboardLayout>
+          <div className="animate-fade-in h-[calc(100vh-8rem)]">
+            <ChatView recipientId={chatUserId} onBack={closeChat} />
           </div>
+        </DashboardLayout>
+      );
+    }
+
+    return (
+      <DashboardLayout>
+        <div className="mx-auto animate-fade-in space-y-3">
+          <h1 className="text-lg font-bold tracking-tight">Community</h1>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-full bg-secondary/40 rounded-xl h-9">
+              <TabsTrigger value="people" className="flex-1 rounded-lg text-[11px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground h-7">
+                <Users className="h-3.5 w-3.5 mr-1" /> People
+              </TabsTrigger>
+              <TabsTrigger value="messages" className="flex-1 rounded-lg text-[11px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground h-7">
+                <MessageSquare className="h-3.5 w-3.5 mr-1" /> Chats
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="people">
+              <PeopleTab isMobile={true} />
+            </TabsContent>
+            <TabsContent value="messages">
+              <MessagesTab isMobile={true} onOpenChat={openChat} />
+            </TabsContent>
+          </Tabs>
         </div>
       </DashboardLayout>
     );
   }
 
-  // ── Mobile: tabs ──
+  // ── DESKTOP: 2-panel with dynamic right side ──
+  // Right panel shows: profile if viewing, chat if chatting, otherwise messages list
+  const rightPanelContent = () => {
+    if (chatUserId) {
+      return (
+        <div className="h-full flex flex-col">
+          <ChatView recipientId={chatUserId} onBack={closeChat} embedded />
+        </div>
+      );
+    }
+    if (viewingProfileId) {
+      return (
+        <div className="overflow-y-auto h-full pr-1">
+          <ProfilePanel userId={viewingProfileId} onMessage={openChat} onClose={closeProfile} />
+        </div>
+      );
+    }
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-2 mb-3 shrink-0">
+          <MessageSquare className="h-4 w-4 text-primary" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Messages</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <MessagesTab isMobile={false} onOpenChat={openChat} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
-      <div className="mx-auto animate-fade-in space-y-3">
-        <h1 className="text-lg font-bold tracking-tight">Community</h1>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full bg-secondary/40 rounded-xl h-9">
-            <TabsTrigger value="people" className="flex-1 rounded-lg text-[11px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground h-7">
-              <Users className="h-3.5 w-3.5 mr-1" /> People
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="flex-1 rounded-lg text-[11px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground h-7">
-              <MessageSquare className="h-3.5 w-3.5 mr-1" /> Chats
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex-1 rounded-lg text-[11px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground h-7">
-              <Bell className="h-3.5 w-3.5 mr-1" /> Alerts
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="people">
-            <PeopleTab isMobile={true} />
-          </TabsContent>
-          <TabsContent value="messages">
-            <MessagesTab isMobile={true} onOpenChat={openChat} />
-          </TabsContent>
-          <TabsContent value="notifications">
-            <NotificationsPanel />
-          </TabsContent>
-        </Tabs>
+      <div className="animate-fade-in">
+        <h1 className="text-xl font-bold tracking-tight mb-4">Community</h1>
+        <div className="grid grid-cols-12 gap-4" style={{ height: "calc(100vh - 9rem)" }}>
+          {/* People panel */}
+          <div className="col-span-5 glass-card rounded-2xl p-4 flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 mb-3 shrink-0">
+              <Users className="h-4 w-4 text-primary" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">People</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <PeopleTab isMobile={false} onViewProfile={viewProfile} />
+            </div>
+          </div>
+          {/* Right panel (messages / chat / profile) */}
+          <div className="col-span-7 glass-card rounded-2xl p-4 flex flex-col overflow-hidden">
+            {rightPanelContent()}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
