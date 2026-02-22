@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Clock, ThumbsUp, ThumbsDown, Loader2, Flame, Send, ArrowLeft, AlertCircle, Trophy } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { getRankConfig } from "@/lib/ranks";
+import { ReadMore } from "@/components/ui/read-more";
 
 interface QuestionData {
   id: string;
@@ -227,7 +228,7 @@ const QuestionDetail = () => {
           </div>
 
           <h1 className="text-base sm:text-lg lg:text-xl font-bold tracking-tight leading-snug">{question.title}</h1>
-          <p className="text-sm lg:text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">{question.body}</p>
+          <ReadMore text={question.body} className="text-sm lg:text-base text-muted-foreground leading-relaxed" />
 
           <div className="flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] lg:text-xs font-semibold ${
@@ -288,7 +289,7 @@ const QuestionDetail = () => {
                       )}
                     </div>
 
-                    <p className="text-sm lg:text-base leading-relaxed whitespace-pre-wrap mb-2 lg:mb-3">{a.body}</p>
+                    <ReadMore text={a.body} className="text-sm lg:text-base leading-relaxed mb-2 lg:mb-3" />
 
                     <div className="flex items-center gap-3 lg:gap-4">
                       <button
