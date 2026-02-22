@@ -168,6 +168,39 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          link: string | null
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -215,6 +248,7 @@ export type Database = {
           expert_category: string | null
           id: string
           is_verified_expert: boolean
+          last_seen: string | null
           last_withdrawal_at: string | null
           phone_number: string | null
           rank: Database["public"]["Enums"]["community_rank"]
@@ -236,6 +270,7 @@ export type Database = {
           expert_category?: string | null
           id?: string
           is_verified_expert?: boolean
+          last_seen?: string | null
           last_withdrawal_at?: string | null
           phone_number?: string | null
           rank?: Database["public"]["Enums"]["community_rank"]
@@ -257,6 +292,7 @@ export type Database = {
           expert_category?: string | null
           id?: string
           is_verified_expert?: boolean
+          last_seen?: string | null
           last_withdrawal_at?: string | null
           phone_number?: string | null
           rank?: Database["public"]["Enums"]["community_rank"]
