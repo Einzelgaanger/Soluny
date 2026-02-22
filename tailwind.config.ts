@@ -14,6 +14,9 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        orbitron: ['Orbitron', 'sans-serif'],
+        rajdhani: ['Rajdhani', 'sans-serif'],
+        serif: ['Playfair Display', 'serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -86,10 +89,34 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        glitch: {
+          "0%, 100%": { clipPath: "inset(50% 0 30% 0)" },
+          "20%": { clipPath: "inset(20% 0 60% 0)" },
+          "40%": { clipPath: "inset(40% 0 10% 0)" },
+          "60%": { clipPath: "inset(10% 0 30% 0)" },
+          "80%": { clipPath: "inset(30% 0 20% 0)" },
+        },
+        scanline: {
+          "0%": { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(100%)" },
+        },
+        "float-particle": {
+          "0%, 100%": { transform: "translateY(0) translateX(0)", opacity: "0" },
+          "50%": { opacity: "1" },
+          "100%": { transform: "translateY(-100px) translateX(20px)", opacity: "0" },
+        },
+        "border-glow": {
+          "0%, 100%": { borderColor: "rgba(var(--primary), 0.3)" },
+          "50%": { borderColor: "rgba(var(--primary), 0.8)" },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        glitch: "glitch 1s infinite linear alternate-reverse",
+        scanline: "scanline 8s linear infinite",
+        "float-particle": "float-particle 4s infinite ease-out",
+        "border-glow": "border-glow 3s infinite ease-in-out",
       },
     },
   },

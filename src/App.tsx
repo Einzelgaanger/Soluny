@@ -30,6 +30,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            <div className="hud-frame animate-hud-pulse" />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
