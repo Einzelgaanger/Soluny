@@ -303,6 +303,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_streaks: {
+        Row: {
+          bonus_claimed_today: boolean
+          created_at: string
+          current_streak: number
+          id: string
+          last_login_date: string | null
+          longest_streak: number
+          total_logins: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bonus_claimed_today?: boolean
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_login_date?: string | null
+          longest_streak?: number
+          total_logins?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bonus_claimed_today?: boolean
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_login_date?: string | null
+          longest_streak?: number
+          total_logins?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       votes: {
         Row: {
           answer_id: string

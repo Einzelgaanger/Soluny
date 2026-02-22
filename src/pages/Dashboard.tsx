@@ -2,28 +2,128 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, MessageSquareText, Coins, ArrowUpRight, Flame, Loader2, Wallet, Crown } from "lucide-react";
+import { TrendingUp, MessageSquareText, Coins, Flame, Loader2, Wallet, Crown, Zap, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { getRankConfig, getRankProgress, getSubTier } from "@/lib/ranks";
+import { toast } from "sonner";
+
+const STREAK_BONUSES = [
+  { day: 1, cp: 5, label: "Day 1" },
+  { day: 3, cp: 10, label: "3-Day" },
+  { day: 7, cp: 25, label: "Week" },
+  { day: 14, cp: 50, label: "2 Weeks" },
+  { day: 30, cp: 100, label: "Month" },
+];
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
+  const [streak, setStreak] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [claimingBonus, setClaimingBonus] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [answerCount, setAnswerCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
-        setProfile(data);
-        setLoading(false);
-      });
+
+    const loadAll = async () => {
+      // Load profile, streak, and counts in parallel
+      const [profileRes, streakRes, qCountRes, aCountRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", user.id).single(),
+        supabase.from("user_streaks").select("*").eq("user_id", user.id).single(),
+        supabase.from("questions").select("id", { count: "exact", head: true }).eq("author_id", user.id),
+        supabase.from("answers").select("id", { count: "exact", head: true }).eq("author_id", user.id),
+      ]);
+
+      setProfile(profileRes.data);
+      setQuestionCount(qCountRes.count || 0);
+      setAnswerCount(aCountRes.count || 0);
+
+      // Handle streak - create if doesn't exist
+      const today = new Date().toISOString().split("T")[0];
+
+      if (!streakRes.data) {
+        // Create streak record
+        const { data: newStreak } = await supabase
+          .from("user_streaks")
+          .insert({
+            user_id: user.id,
+            current_streak: 1,
+            longest_streak: 1,
+            last_login_date: today,
+            total_logins: 1,
+            bonus_claimed_today: false,
+          })
+          .select()
+          .single();
+        setStreak(newStreak);
+      } else {
+        const lastLogin = streakRes.data.last_login_date;
+        if (lastLogin !== today) {
+          // New day login
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+          const isConsecutive = lastLogin === yesterdayStr;
+          const newStreak = isConsecutive ? (streakRes.data.current_streak || 0) + 1 : 1;
+          const longestStreak = Math.max(newStreak, streakRes.data.longest_streak || 0);
+
+          const { data: updated } = await supabase
+            .from("user_streaks")
+            .update({
+              current_streak: newStreak,
+              longest_streak: longestStreak,
+              last_login_date: today,
+              total_logins: (streakRes.data.total_logins || 0) + 1,
+              bonus_claimed_today: false,
+            })
+            .eq("user_id", user.id)
+            .select()
+            .single();
+          setStreak(updated);
+        } else {
+          setStreak(streakRes.data);
+        }
+      }
+
+      setLoading(false);
+    };
+    loadAll();
   }, [user]);
+
+  const claimDailyBonus = async () => {
+    if (!user || !streak || streak.bonus_claimed_today) return;
+    setClaimingBonus(true);
+
+    // Calculate bonus CP based on streak
+    const currentDay = streak.current_streak || 1;
+    let bonusCP = 5; // base daily bonus
+    for (const bonus of STREAK_BONUSES) {
+      if (currentDay >= bonus.day) bonusCP = bonus.cp;
+    }
+
+    // Update profile CP and mark bonus claimed
+    const [, streakUpdate] = await Promise.all([
+      supabase
+        .from("profiles")
+        .update({ cp_balance: (profile?.cp_balance || 0) + bonusCP })
+        .eq("user_id", user.id),
+      supabase
+        .from("user_streaks")
+        .update({ bonus_claimed_today: true })
+        .eq("user_id", user.id)
+        .select()
+        .single(),
+    ]);
+
+    setStreak(streakUpdate.data);
+    setProfile((prev: any) => ({ ...prev, cp_balance: (prev?.cp_balance || 0) + bonusCP }));
+    toast.success(`+${bonusCP} CP daily bonus claimed! 🔥`);
+    setClaimingBonus(false);
+  };
 
   if (loading) {
     return (
@@ -37,6 +137,14 @@ const Dashboard = () => {
   const cp = profile?.cp_balance || 0;
   const cpProgress = getRankProgress(profile?.rank || "newcomer", cp);
   const sub = getSubTier(profile?.subscription_plan || "free");
+  const currentStreak = streak?.current_streak || 0;
+  const bonusClaimed = streak?.bonus_claimed_today || false;
+
+  // Calculate today's bonus amount
+  let todayBonus = 5;
+  for (const bonus of STREAK_BONUSES) {
+    if (currentStreak >= bonus.day) todayBonus = bonus.cp;
+  }
 
   return (
     <DashboardLayout>
@@ -56,7 +164,35 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        {/* Rank card with animal image */}
+        {/* Streak + Daily bonus */}
+        <div className="glass-card rounded-xl p-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-primary/10 border border-primary/20">
+              <Flame className="h-5 w-5 text-primary" />
+              <span className="text-[10px] font-mono font-bold text-primary">{currentStreak}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold">
+                {currentStreak > 0 ? `${currentStreak}-day streak!` : "Start your streak!"}
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {bonusClaimed ? "Bonus claimed today ✓" : `Claim +${todayBonus} CP daily bonus`}
+              </div>
+            </div>
+          </div>
+          {!bonusClaimed && (
+            <Button
+              onClick={claimDailyBonus}
+              size="sm"
+              disabled={claimingBonus}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs px-3 shrink-0"
+            >
+              {claimingBonus ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Zap className="h-3 w-3 mr-1" /> Claim</>}
+            </Button>
+          )}
+        </div>
+
+        {/* Rank card */}
         <div className="glass-card rounded-xl p-4 flex items-center gap-4">
           <img src={rank.image} alt={rank.label} className="h-16 w-16 rounded-xl object-cover border-2 border-border/40" />
           <div className="flex-1 min-w-0">
@@ -64,7 +200,6 @@ const Dashboard = () => {
               <span className={`text-sm font-bold ${rank.color}`}>{rank.animal} {rank.label}</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-mono">{cp} CP</span>
             </div>
-            {/* XP bar */}
             <div className="h-2 rounded-full bg-secondary/50 overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700"
@@ -78,14 +213,15 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats grid - compact */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { label: "Balance", value: `KES ${Number(profile?.available_balance_kes || 0).toLocaleString()}`, icon: Wallet, glow: "" },
-            { label: "Earned", value: `KES ${Number(profile?.total_earnings_kes || 0).toLocaleString()}`, icon: Coins, glow: "glow-variant-success" },
-            { label: "Plan", value: `${sub.icon} ${sub.name}`, icon: Crown, glow: "glow-variant-info" },
+            { label: "Balance", value: `KES ${Number(profile?.available_balance_kes || 0).toLocaleString()}`, icon: Wallet },
+            { label: "Earned", value: `KES ${Number(profile?.total_earnings_kes || 0).toLocaleString()}`, icon: Coins },
+            { label: "Questions", value: questionCount.toString(), icon: MessageSquareText },
+            { label: "Answers", value: answerCount.toString(), icon: TrendingUp },
           ].map((s) => (
-            <div key={s.label} className={`glass-card stat-card-glow ${s.glow} rounded-xl p-3 space-y-1`}>
+            <div key={s.label} className="glass-card rounded-xl p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{s.label}</span>
                 <s.icon className="h-3 w-3 text-muted-foreground" />
@@ -95,25 +231,48 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* Subscription limits info */}
-        <div className="glass-card rounded-xl p-3">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Your Limits</div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-            <div className="bg-secondary/30 rounded-lg p-2 text-center">
-              <div className="font-mono font-bold">{sub.limits.dailyAnswers}</div>
-              <div className="text-muted-foreground">Answers/day</div>
+        {/* Subscription + Streak milestones */}
+        <div className="grid sm:grid-cols-2 gap-2">
+          {/* Plan info */}
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Your Plan</span>
             </div>
-            <div className="bg-secondary/30 rounded-lg p-2 text-center">
-              <div className="font-mono font-bold">{sub.limits.platformFee}%</div>
-              <div className="text-muted-foreground">Platform fee</div>
+            <div className="text-sm font-bold mb-1">{sub.icon} {sub.name}</div>
+            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+              <div className="bg-secondary/30 rounded-lg px-2 py-1.5 text-center">
+                <div className="font-mono font-bold">{sub.limits.dailyAnswers >= 999 ? "∞" : sub.limits.dailyAnswers}</div>
+                <div className="text-muted-foreground">Answers/day</div>
+              </div>
+              <div className="bg-secondary/30 rounded-lg px-2 py-1.5 text-center">
+                <div className="font-mono font-bold">{sub.limits.platformFee}%</div>
+                <div className="text-muted-foreground">Fee</div>
+              </div>
             </div>
-            <div className="bg-secondary/30 rounded-lg p-2 text-center">
-              <div className="font-mono font-bold">KES {sub.limits.maxWithdrawal.toLocaleString()}</div>
-              <div className="text-muted-foreground">Max withdraw</div>
+          </div>
+
+          {/* Streak milestones */}
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Streak Bonuses</span>
             </div>
-            <div className="bg-secondary/30 rounded-lg p-2 text-center">
-              <div className="font-mono font-bold">{sub.limits.questionsPerMonth >= 999 ? "∞" : sub.limits.questionsPerMonth}</div>
-              <div className="text-muted-foreground">Questions/mo</div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {STREAK_BONUSES.map((b) => {
+                const reached = currentStreak >= b.day;
+                return (
+                  <div
+                    key={b.day}
+                    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg min-w-[48px] text-[9px] ${
+                      reached ? "bg-primary/10 border border-primary/30" : "bg-secondary/30"
+                    }`}
+                  >
+                    <span className={`font-bold ${reached ? "text-primary" : "text-muted-foreground"}`}>{b.label}</span>
+                    <span className={`font-mono ${reached ? "text-foreground" : "text-muted-foreground"}`}>+{b.cp}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -136,7 +295,7 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        {/* Rank progression preview */}
+        {/* Rank progression */}
         <div className="glass-card rounded-xl p-3">
           <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Rank Progression</div>
           <div className="flex items-center justify-between gap-1 overflow-x-auto pb-1">
