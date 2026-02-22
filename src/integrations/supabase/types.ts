@@ -141,6 +141,33 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read: boolean
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -188,6 +215,7 @@ export type Database = {
           expert_category: string | null
           id: string
           is_verified_expert: boolean
+          last_withdrawal_at: string | null
           phone_number: string | null
           rank: Database["public"]["Enums"]["community_rank"]
           subscription_expires_at: string | null
@@ -196,6 +224,7 @@ export type Database = {
           total_earnings_kes: number
           updated_at: string
           user_id: string
+          username: string | null
         }
         Insert: {
           available_balance_kes?: number
@@ -207,6 +236,7 @@ export type Database = {
           expert_category?: string | null
           id?: string
           is_verified_expert?: boolean
+          last_withdrawal_at?: string | null
           phone_number?: string | null
           rank?: Database["public"]["Enums"]["community_rank"]
           subscription_expires_at?: string | null
@@ -215,6 +245,7 @@ export type Database = {
           total_earnings_kes?: number
           updated_at?: string
           user_id: string
+          username?: string | null
         }
         Update: {
           available_balance_kes?: number
@@ -226,6 +257,7 @@ export type Database = {
           expert_category?: string | null
           id?: string
           is_verified_expert?: boolean
+          last_withdrawal_at?: string | null
           phone_number?: string | null
           rank?: Database["public"]["Enums"]["community_rank"]
           subscription_expires_at?: string | null
@@ -234,6 +266,7 @@ export type Database = {
           total_earnings_kes?: number
           updated_at?: string
           user_id?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -373,6 +406,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      withdrawal_settings: {
+        Row: {
+          cooldown_hours: number
+          daily_limit: number
+          fee_percentage: number
+          id: string
+          max_withdrawal: number
+          min_withdrawal: number
+          plan: string
+        }
+        Insert: {
+          cooldown_hours?: number
+          daily_limit?: number
+          fee_percentage?: number
+          id?: string
+          max_withdrawal?: number
+          min_withdrawal?: number
+          plan: string
+        }
+        Update: {
+          cooldown_hours?: number
+          daily_limit?: number
+          fee_percentage?: number
+          id?: string
+          max_withdrawal?: number
+          min_withdrawal?: number
+          plan?: string
+        }
+        Relationships: []
       }
     }
     Views: {
