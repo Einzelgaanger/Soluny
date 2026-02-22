@@ -24,16 +24,54 @@ interface Conversation {
   unread: number;
 }
 
-// ─── Online Status Hook ──────────────────────────────
+// ─── Online Presence via Realtime ─────────────────────
+const PRESENCE_CHANNEL = "global-presence";
+
 export const useUpdateLastSeen = () => {
   const { user } = useAuth();
   useEffect(() => {
     if (!user) return;
+    // Also update DB for fallback
     const update = () => supabase.from("profiles").update({ last_seen: new Date().toISOString() }).eq("user_id", user.id);
     update();
     const interval = setInterval(update, 60000);
-    return () => clearInterval(interval);
+
+    // Join global presence channel
+    const channel = supabase.channel(PRESENCE_CHANNEL);
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await channel.track({ user_id: user.id, online_at: new Date().toISOString() });
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [user]);
+};
+
+// Hook to track who's online via presence
+export const useOnlineUsers = () => {
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const channel = supabase.channel(PRESENCE_CHANNEL);
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const ids = new Set<string>();
+        Object.values(state).flat().forEach((p: any) => {
+          if (p.user_id) ids.add(p.user_id);
+        });
+        setOnlineIds(ids);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  return onlineIds;
 };
 
 const isOnline = (lastSeen: string | null) => {
@@ -110,7 +148,7 @@ const ReadReceipt = ({ sent, read }: { sent: boolean; read: boolean }) => {
 };
 
 // ─── People Tab ────────────────────────────────────────
-const PeopleTab = ({ isMobile, onViewProfile }: { isMobile: boolean; onViewProfile?: (id: string) => void }) => {
+const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; onViewProfile?: (id: string) => void; onlineIds?: Set<string> }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -181,7 +219,7 @@ const PeopleTab = ({ isMobile, onViewProfile }: { isMobile: boolean; onViewProfi
         <div className="divide-y divide-border/20">
           {displayList.map((p: any) => {
             const rank = getRankConfig(p.rank || "newcomer");
-            const online = isOnline(p.last_seen);
+            const online = onlineIds ? onlineIds.has(p.user_id) : isOnline(p.last_seen);
             const content = (
               <div className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/5 rounded-lg transition-colors cursor-pointer">
                 <AvatarWithStatus url={p.avatar_url} name={p.display_name} online={online} size={isMobile ? "sm" : "md"} />
@@ -345,7 +383,7 @@ const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessag
 };
 
 // ─── Chat View (DM with a specific user) ──────────────
-const ChatView = ({ recipientId, onBack, embedded }: { recipientId: string; onBack: () => void; embedded?: boolean }) => {
+const ChatView = ({ recipientId, onBack, embedded, onlineIds }: { recipientId: string; onBack: () => void; embedded?: boolean; onlineIds?: Set<string> }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [messages, setMessages] = useState<any[]>([]);
@@ -440,80 +478,131 @@ const ChatView = ({ recipientId, onBack, embedded }: { recipientId: string; onBa
     supabase.channel(channelName).track({ user_id: user.id, typing: false });
   };
 
-  const online = recipientProfile ? isOnline(recipientProfile.last_seen) : false;
+  const online = onlineIds ? onlineIds.has(recipientId) : (recipientProfile ? isOnline(recipientProfile.last_seen) : false);
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className={`flex items-center gap-3 ${embedded ? "pb-3" : "pb-2.5"} border-b border-border/30 shrink-0`}>
-        <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors">
+      <div className="flex items-center gap-3 pb-3 border-b border-border/30 shrink-0 bg-background/80 backdrop-blur-sm z-10">
+        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-all">
           <ArrowLeft className="h-4 w-4" />
         </button>
         {recipientProfile && (
           <Link to={`/dashboard/user/${recipientId}`} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity flex-1 min-w-0">
             <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} online={online} size={isMobile ? "sm" : "md"} />
             <div className="min-w-0">
-              <div className={`${isMobile ? "text-sm" : "text-sm"} font-semibold truncate`}>{recipientProfile.display_name || "Anonymous"}</div>
-              <div className="text-[10px] text-muted-foreground">
-                {recipientProfile.username && `@${recipientProfile.username} · `}
-                {online ? <span className="text-success">Active now</span> : "Offline"}
+              <div className="text-sm font-semibold truncate">{recipientProfile.display_name || "Anonymous"}</div>
+              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                {recipientProfile.username && <span>@{recipientProfile.username}</span>}
+                {recipientProfile.username && <span>·</span>}
+                {online ? (
+                  <span className="flex items-center gap-1 text-success font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                    Active now
+                  </span>
+                ) : (
+                  <span>
+                    {recipientProfile.last_seen
+                      ? `Last seen ${formatDistanceToNow(new Date(recipientProfile.last_seen), { addSuffix: true })}`
+                      : "Offline"}
+                  </span>
+                )}
               </div>
             </div>
           </Link>
         )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-3 space-y-1.5 min-h-0">
-        {messages.length === 0 && (
-          <div className="text-center py-10 text-muted-foreground text-xs">
-            <MessageSquare className="h-6 w-6 mx-auto mb-2 opacity-20" />
-            Start a conversation!
-          </div>
-        )}
-        {messages.map((m: any, i: number) => {
-          const isMe = m.sender_id === user?.id;
-          const showDate = i === 0 || new Date(m.created_at).toDateString() !== new Date(messages[i - 1].created_at).toDateString();
-          return (
-            <div key={m.id}>
-              {showDate && (
-                <div className="text-center text-[10px] text-muted-foreground/60 py-2">
-                  {new Date(m.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                </div>
-              )}
-              <div className={`flex ${isMe ? "justify-end" : "justify-start"} group`}>
-                <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${
-                  isMe ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary rounded-bl-md"
-                }`}>
-                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                  <div className={`flex items-center gap-1 mt-0.5 ${isMe ? "justify-end" : "justify-start"}`}>
-                    <span className={`text-[9px] ${isMe ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
-                      {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                    {isMe && <ReadReceipt sent={true} read={m.read} />}
+      {/* Messages area with subtle pattern bg */}
+      <div className="flex-1 overflow-y-auto min-h-0 chat-bg-pattern">
+        <div className="py-4 px-2 space-y-2">
+          {messages.length === 0 && (
+            <div className="text-center py-16">
+              <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10 mb-3">
+                <MessageSquare className="h-7 w-7 text-primary/60" />
+              </div>
+              <p className="text-sm text-muted-foreground">No messages yet</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-1">Say hello to start a conversation ✨</p>
+            </div>
+          )}
+          {messages.map((m: any, i: number) => {
+            const isMe = m.sender_id === user?.id;
+            const showDate = i === 0 || new Date(m.created_at).toDateString() !== new Date(messages[i - 1].created_at).toDateString();
+            const isConsecutive = i > 0 && messages[i - 1].sender_id === m.sender_id && !showDate;
+            return (
+              <div key={m.id}>
+                {showDate && (
+                  <div className="flex items-center justify-center py-3">
+                    <div className="px-3 py-1 rounded-full bg-secondary/60 backdrop-blur-sm text-[10px] text-muted-foreground font-medium">
+                      {new Date(m.created_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                    </div>
+                  </div>
+                )}
+                <div className={`flex ${isMe ? "justify-end" : "justify-start"} ${isConsecutive ? "mt-0.5" : "mt-2"} group`}>
+                  {/* Incoming: show small avatar for first msg in group */}
+                  {!isMe && !isConsecutive && recipientProfile && (
+                    <div className="mr-2 mt-auto mb-1">
+                      <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} size="sm" />
+                    </div>
+                  )}
+                  {!isMe && isConsecutive && <div className="w-10 mr-2 shrink-0" />}
+                  <div className={`max-w-[70%] relative ${isMe ? "chat-bubble-sent" : "chat-bubble-received"}`}>
+                    <div className={`px-3.5 py-2 text-sm leading-relaxed ${
+                      isMe
+                        ? "bg-gradient-to-br from-primary to-primary/85 text-primary-foreground rounded-2xl rounded-br-sm shadow-[0_2px_8px_rgba(245,189,65,0.2)]"
+                        : "bg-card border border-border/40 text-foreground rounded-2xl rounded-bl-sm shadow-sm"
+                    }`}>
+                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                      <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
+                        <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/40" : "text-muted-foreground/50"}`}>
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {isMe && <ReadReceipt sent={true} read={m.read} />}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+            );
+          })}
+          {isTyping && (
+            <div className="flex justify-start mt-2">
+              {recipientProfile && (
+                <div className="mr-2 mt-auto mb-1">
+                  <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} size="sm" />
+                </div>
+              )}
+              <div className="bg-card border border-border/40 rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-1.5 shadow-sm">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
             </div>
-          );
-        })}
-        {isTyping && <TypingIndicator />}
-        <div ref={messagesEndRef} />
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Input */}
-      <div className={`flex items-center gap-2 pt-2.5 border-t border-border/30 shrink-0 ${isMobile ? "pb-2" : ""}`}>
-        <Input
-          value={newMsg}
-          onChange={(e) => {
-            setNewMsg(e.target.value);
-            broadcastTyping();
-          }}
-          placeholder="Type a message..."
-          className="flex-1 h-9 text-sm bg-secondary/30 border-border/40 rounded-xl"
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-        />
-        <Button onClick={sendMessage} disabled={sending || !newMsg.trim()} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-9 px-3">
+      {/* Input bar */}
+      <div className={`flex items-center gap-2.5 pt-3 border-t border-border/30 shrink-0 bg-background/80 backdrop-blur-sm ${isMobile ? "pb-2" : ""}`}>
+        <div className="flex-1 relative">
+          <Input
+            value={newMsg}
+            onChange={(e) => {
+              setNewMsg(e.target.value);
+              broadcastTyping();
+            }}
+            placeholder="Type a message..."
+            className="h-10 text-sm bg-secondary/40 border-border/30 rounded-2xl pl-4 pr-4 focus-visible:ring-primary/30"
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+          />
+        </div>
+        <Button
+          onClick={sendMessage}
+          disabled={sending || !newMsg.trim()}
+          size="sm"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl h-10 w-10 p-0 shadow-[0_2px_8px_rgba(245,189,65,0.25)] transition-all hover:shadow-[0_4px_12px_rgba(245,189,65,0.35)] disabled:shadow-none"
+        >
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </div>
@@ -654,6 +743,7 @@ const Community = () => {
   const [activeTab, setActiveTab] = useState(recipientId ? "messages" : "people");
   const [chatUserId, setChatUserId] = useState<string | null>(recipientId || null);
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
+  const onlineIds = useOnlineUsers();
 
   useUpdateLastSeen();
 
@@ -692,7 +782,7 @@ const Community = () => {
       return (
         <DashboardLayout>
           <div className="animate-fade-in h-[calc(100vh-8rem)]">
-            <ChatView recipientId={chatUserId} onBack={closeChat} />
+            <ChatView recipientId={chatUserId} onBack={closeChat} onlineIds={onlineIds} />
           </div>
         </DashboardLayout>
       );
@@ -712,7 +802,7 @@ const Community = () => {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="people">
-              <PeopleTab isMobile={true} />
+              <PeopleTab isMobile={true} onlineIds={onlineIds} />
             </TabsContent>
             <TabsContent value="messages">
               <MessagesTab isMobile={true} onOpenChat={openChat} />
@@ -729,7 +819,7 @@ const Community = () => {
     if (chatUserId) {
       return (
         <div className="h-full flex flex-col">
-          <ChatView recipientId={chatUserId} onBack={closeChat} embedded />
+          <ChatView recipientId={chatUserId} onBack={closeChat} embedded onlineIds={onlineIds} />
         </div>
       );
     }
@@ -765,7 +855,7 @@ const Community = () => {
               <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">People</h2>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <PeopleTab isMobile={false} onViewProfile={viewProfile} />
+              <PeopleTab isMobile={false} onViewProfile={viewProfile} onlineIds={onlineIds} />
             </div>
           </div>
           {/* Right panel (messages / chat / profile) */}
