@@ -8,6 +8,8 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Questions from "./pages/Questions";
 import NewQuestion from "./pages/NewQuestion";
@@ -15,7 +17,6 @@ import QuestionDetail from "./pages/QuestionDetail";
 import Earnings from "./pages/Earnings";
 import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 
@@ -33,6 +34,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/questions" element={<Questions />} />
@@ -41,7 +44,6 @@ const App = () => (
               <Route path="/dashboard/earnings" element={<Earnings />} />
               <Route path="/dashboard/leaderboard" element={<Leaderboard />} />
               <Route path="/dashboard/profile" element={<Profile />} />
-              <Route path="/dashboard/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

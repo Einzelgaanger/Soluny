@@ -5,7 +5,6 @@ import {
   Trophy,
   Wallet,
   User,
-  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -24,7 +23,6 @@ const navItems = [
   { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard" },
   { icon: Wallet, label: "Earnings", path: "/dashboard/earnings" },
   { icon: User, label: "Profile", path: "/dashboard/profile" },
-  { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 
 interface Props {
