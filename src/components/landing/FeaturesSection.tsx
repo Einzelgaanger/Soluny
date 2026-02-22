@@ -1,5 +1,6 @@
 import { Swords, Vote, Flame, Trophy, Shield, Activity, Zap, Cpu, Scan, Box } from "lucide-react";
 import dragonImg from "@/assets/ranks/dragon.png";
+import featuresBg from "@/assets/features-bg.jpg";
 import { motion } from "framer-motion";
 
 const features = [
@@ -55,7 +56,12 @@ const features = [
 
 const FeaturesSection = () => {
   return (
-    <section id="features" className="py-24 sm:py-32 relative overflow-hidden bg-background">
+    <section id="features" className="py-24 sm:py-32 relative overflow-hidden">
+      {/* Cinematic Background */}
+      <div className="absolute inset-0 z-0">
+        <img src={featuresBg} alt="" className="w-full h-full object-cover opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background" />
+      </div>
       <div className="absolute inset-0 bg-grid opacity-[0.03] pointer-events-none" />
 
       <div className="container px-4 sm:px-6 relative z-10">
