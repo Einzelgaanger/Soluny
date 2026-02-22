@@ -6,6 +6,69 @@
 
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 220 25% 10%;
+
+    --card: 0 0% 98%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 0 0% 98%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 45 93% 47%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 220 25% 10%;
+
+    --muted: 220 14% 93%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 38 95% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 76% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 95% 50%;
+    --warning-foreground: 220 25% 10%;
+
+    --info: 199 95% 45%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 45 93% 47%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 215 15% 45%;
+    --sidebar-primary: 45 93% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 95%;
+    --sidebar-accent-foreground: 220 25% 10%;
+    --sidebar-border: 220 13% 90%;
+    --sidebar-ring: 45 93% 47%;
+
+    --chart-1: 45 93% 47%;
+    --chart-2: 199 95% 45%;
+    --chart-3: 152 76% 40%;
+    --chart-4: 270 70% 55%;
+    --chart-5: 0 85% 55%;
+    --chart-6: 25 95% 50%;
+
+    --glass-bg: rgba(0, 0, 0, 0.02);
+    --glass-border: rgba(0, 0, 0, 0.06);
+    --glow-gold: rgba(245, 189, 65, 0.12);
+    --glow-blue: rgba(56, 189, 248, 0.1);
+    --glow-green: rgba(34, 197, 94, 0.1);
+  }
+
+  .dark {
     --background: 220 25% 6%;
     --foreground: 210 20% 98%;
 
@@ -43,8 +106,6 @@
     --input: 220 20% 18%;
     --ring: 45 93% 52%;
 
-    --radius: 0.75rem;
-
     --sidebar-background: 220 28% 5%;
     --sidebar-foreground: 215 15% 55%;
     --sidebar-primary: 45 93% 52%;
@@ -78,6 +139,10 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  .dark body,
+  body.dark {
     background-image:
       radial-gradient(ellipse 80% 60% at 50% 0%, hsla(45, 93%, 52%, 0.03), transparent),
       radial-gradient(ellipse 60% 50% at 100% 100%, hsla(199, 95%, 55%, 0.02), transparent);
@@ -124,11 +189,16 @@
   }
 
   .glass-card {
-    background: hsl(220 25% 9% / 0.8);
+    background: hsl(var(--card));
     backdrop-filter: blur(24px);
-    border: 1px solid hsl(220 20% 18% / 0.6);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    border: 1px solid hsl(var(--border) / 0.6);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
     position: relative;
+  }
+
+  .dark .glass-card {
+    background: hsl(220 25% 9% / 0.8);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   }
 
   .glass-card::before {

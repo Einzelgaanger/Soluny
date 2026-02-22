@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { User, Loader2, Camera } from "lucide-react";
+import { User, Loader2, Camera, Settings, Sun, Moon } from "lucide-react";
 import { getRankConfig, getRankProgress, getSubTier } from "@/lib/ranks";
+import { useTheme } from "@/hooks/useTheme";
 
 const Profile = () => {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [phone, setPhone] = useState("");
@@ -65,7 +68,19 @@ const Profile = () => {
   return (
     <DashboardLayout>
       <div className="max-w-xl mx-auto space-y-4 animate-fade-in">
-        <h1 className="text-lg font-bold tracking-tight">Profile</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold tracking-tight">Profile</h1>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleTheme} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <Link to="/dashboard/settings">
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                <Settings className="h-3.5 w-3.5" /> Subscription
+              </Button>
+            </Link>
+          </div>
+        </div>
 
         {/* Avatar & rank */}
         <div className="glass-card rounded-xl p-4 flex items-center gap-4">
@@ -136,6 +151,25 @@ const Profile = () => {
           <Button onClick={handleSave} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs" disabled={saving}>
             {saving && <Loader2 className="h-3 w-3 animate-spin mr-1" />} Save Changes
           </Button>
+        </div>
+
+        {/* Subscription summary on profile page */}
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold">Current Plan</span>
+            <span className={`text-xs font-bold ${sub.color}`}>{sub.icon} {sub.name}</span>
+          </div>
+          <ul className="space-y-1">
+            <li className="text-[10px] text-muted-foreground">• {sub.limits.dailyAnswers === 999 ? "Unlimited" : sub.limits.dailyAnswers} answers/day</li>
+            <li className="text-[10px] text-muted-foreground">• {sub.limits.questionsPerMonth === 999 ? "Unlimited" : sub.limits.questionsPerMonth} questions/month</li>
+            <li className="text-[10px] text-muted-foreground">• {sub.limits.platformFee}% platform fee</li>
+            <li className="text-[10px] text-muted-foreground">• KES {sub.limits.maxWithdrawal === 999999 ? "Unlimited" : sub.limits.maxWithdrawal.toLocaleString()} max withdrawal</li>
+          </ul>
+          <Link to="/dashboard/settings">
+            <Button variant="outline" size="sm" className="w-full mt-3 h-7 text-[10px]">
+              Manage Subscription →
+            </Button>
+          </Link>
         </div>
       </div>
     </DashboardLayout>
