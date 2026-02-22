@@ -214,5 +214,44 @@ async function distributeForQuestion(
     .update({ status: "closed" })
     .eq("id", questionId);
 
+  // Send email notifications to winners
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  for (let i = 0; i < winners; i++) {
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          type: "earnings_distributed",
+          user_id: eligible[i].author_id,
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to send earnings notification:", e);
+    }
+  }
+
+  // Send voting closed notification to question author
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        type: "voting_closed",
+        question_id: questionId,
+      }),
+    });
+  } catch (e) {
+    console.error("Failed to send voting closed notification:", e);
+  }
+
   return { question_id: questionId, distributed: distributablePool, platform_fee: platformFee, winners };
 }

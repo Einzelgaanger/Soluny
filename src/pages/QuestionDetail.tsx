@@ -133,6 +133,14 @@ const QuestionDetail = () => {
       toast.success("Answer submitted!");
       setNewAnswer("");
       setHasAnswered(true);
+      // Send notification to question author
+      try {
+        await supabase.functions.invoke("send-notification", {
+          body: { type: "new_answer", question_id: id, user_id: user.id },
+        });
+      } catch (e) {
+        console.error("Notification failed:", e);
+      }
       // Refresh answers
       const { data } = await supabase.from("answers").select("*").eq("question_id", id).order("net_score", { ascending: false });
       setAnswers((data as AnswerData[]) || []);
