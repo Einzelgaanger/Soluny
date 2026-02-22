@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Trophy } from "lucide-react";
@@ -11,7 +12,7 @@ const Leaderboard = () => {
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("display_name, cp_balance, rank, avatar_url, total_earnings_kes")
+      .select("user_id, display_name, username, cp_balance, rank, avatar_url, total_earnings_kes")
       .order("cp_balance", { ascending: false })
       .limit(50)
       .then(({ data }) => {
@@ -46,9 +47,8 @@ const Leaderboard = () => {
                   const rank = getRankConfig(l.rank || "newcomer");
                   const isFirst = idx === 0;
                   return (
-                    <div key={idx} className={`flex flex-col items-center ${isFirst ? "order-2" : idx === 1 ? "order-1" : "order-3"}`}>
+                    <Link to={`/dashboard/user/${l.user_id}`} key={idx} className={`flex flex-col items-center hover:opacity-90 transition-opacity ${isFirst ? "order-2" : idx === 1 ? "order-1" : "order-3"}`}>
                       <div className={`relative ${isFirst ? "mb-2 lg:mb-3" : "mb-1 lg:mb-2"}`}>
-                        {/* Avatar with rank icon overlay */}
                         <div className={`${isFirst ? "h-16 w-16 lg:h-24 lg:w-24" : "h-12 w-12 lg:h-18 lg:w-18"} rounded-xl lg:rounded-2xl overflow-hidden border-2 ${isFirst ? "border-primary" : "border-border/40"}`}>
                           {l.avatar_url ? (
                             <img src={l.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -60,15 +60,9 @@ const Leaderboard = () => {
                             </div>
                           )}
                         </div>
-                        {/* Rank image badge */}
-                        <img
-                          src={rank.image}
-                          alt={rank.label}
-                          className={`absolute -bottom-1 -right-1 lg:-bottom-2 lg:-right-2 ${isFirst ? "h-7 w-7 lg:h-10 lg:w-10" : "h-5 w-5 lg:h-8 lg:w-8"} rounded-lg border-2 border-background object-cover`}
-                        />
-                        {/* Position badge */}
+                        <img src={rank.image} alt={rank.label} className={`absolute -bottom-1 -right-1 lg:-bottom-2 lg:-right-2 ${isFirst ? "h-7 w-7 lg:h-10 lg:w-10" : "h-5 w-5 lg:h-8 lg:w-8"} rounded-lg border-2 border-background object-cover`} />
                         <div className={`absolute -top-1 -left-1 lg:-top-2 lg:-left-2 ${isFirst ? "h-6 w-6 lg:h-8 lg:w-8 text-xs lg:text-sm" : "h-5 w-5 lg:h-7 lg:w-7 text-[10px] lg:text-xs"} rounded-full flex items-center justify-center font-bold ${
-                          idx === 0 ? "bg-primary text-primary-foreground" : idx === 1 ? "bg-secondary text-foreground" : "bg-secondary text-foreground"
+                          idx === 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
                         }`}>
                           {idx + 1}
                         </div>
@@ -76,20 +70,19 @@ const Leaderboard = () => {
                       <span className="text-[11px] lg:text-sm font-semibold truncate max-w-[70px] lg:max-w-[120px]">{l.display_name || "Anon"}</span>
                       <span className={`text-[10px] lg:text-xs font-bold ${rank.color}`}>{rank.label}</span>
                       <span className="text-[10px] lg:text-xs font-mono font-bold text-primary">{l.cp_balance} CP</span>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
             )}
 
-            {/* List — mobile compact, desktop wider */}
+            {/* List */}
             <div className="divide-y divide-border/20">
               {leaders.map((l, i) => {
                 const rank = getRankConfig(l.rank || "newcomer");
                 return (
-                  <div key={i} className="flex items-center gap-3 lg:gap-4 py-2 lg:py-3 px-1 lg:px-3 hover:bg-muted/5 transition-colors rounded-lg">
+                  <Link to={`/dashboard/user/${l.user_id}`} key={i} className="flex items-center gap-3 lg:gap-4 py-2 lg:py-3 px-1 lg:px-3 hover:bg-muted/5 transition-colors rounded-lg">
                     <span className="text-[11px] lg:text-sm font-mono text-muted-foreground w-6 lg:w-8 text-right shrink-0">{i + 1}</span>
-                    {/* Avatar */}
                     <div className="h-7 w-7 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl overflow-hidden shrink-0 bg-secondary">
                       {l.avatar_url ? (
                         <img src={l.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -99,11 +92,11 @@ const Leaderboard = () => {
                         </div>
                       )}
                     </div>
-                    {/* Rank image */}
                     <img src={rank.image} alt={rank.label} className="h-5 w-5 lg:h-7 lg:w-7 rounded object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 lg:gap-2">
                         <span className="text-xs lg:text-sm font-medium truncate">{l.display_name || "Anonymous"}</span>
+                        {l.username && <span className="text-[10px] lg:text-xs text-muted-foreground">@{l.username}</span>}
                         <span className={`text-[10px] lg:text-xs font-bold ${rank.color}`}>{rank.label}</span>
                       </div>
                     </div>
@@ -114,7 +107,7 @@ const Leaderboard = () => {
                     <div className="text-right shrink-0 hidden sm:block">
                       <div className="text-[10px] lg:text-xs font-mono text-muted-foreground">KES {Number(l.total_earnings_kes || 0).toLocaleString()}</div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

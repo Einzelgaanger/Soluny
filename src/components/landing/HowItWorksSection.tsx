@@ -1,4 +1,5 @@
 import { MessageSquarePlus, ThumbsUp, Swords, Trophy, Target, Cpu, Share2 } from "lucide-react";
+import howitBg from "@/assets/howit-bg.jpg";
 import { motion } from "framer-motion";
 
 const steps = [
@@ -34,7 +35,12 @@ const steps = [
 
 const HowItWorksSection = () => {
   return (
-    <section id="how-it-works" className="py-24 sm:py-32 relative border-y border-primary/10 bg-background/50 overflow-hidden">
+    <section id="how-it-works" className="py-24 sm:py-32 relative border-y border-primary/10 overflow-hidden">
+      {/* Cinematic Background */}
+      <div className="absolute inset-0 z-0">
+        <img src={howitBg} alt="" className="w-full h-full object-cover opacity-25" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/70 to-background" />
+      </div>
       <div className="absolute inset-0 bg-grid opacity-[0.02] pointer-events-none" />
 
       <div className="container px-4 sm:px-6 relative z-10">
