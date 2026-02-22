@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -193,7 +194,7 @@ const Profile = () => {
   // DESKTOP LAYOUT (lg+)
   // ================================
   const DesktopLayout = () => (
-    <div className="hidden lg:block animate-fade-in pb-8">
+    <div className="animate-fade-in pb-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
         <div className="flex items-center gap-3">
@@ -318,7 +319,7 @@ const Profile = () => {
   // MOBILE LAYOUT (< lg)
   // ================================
   const MobileLayout = () => (
-    <div className="lg:hidden space-y-4 animate-fade-in pb-8">
+    <div className="space-y-4 animate-fade-in pb-8">
       <h1 className="text-lg font-bold tracking-tight">My Profile</h1>
 
       {/* Avatar & rank */}
@@ -447,11 +448,12 @@ const Profile = () => {
     </div>
   );
 
+  const isMobile = useIsMobile();
+
   return (
     <DashboardLayout>
       {avatarInput}
-      <DesktopLayout />
-      <MobileLayout />
+      {isMobile ? <MobileLayout /> : <DesktopLayout />}
 
       {/* Phone verification dialog */}
       <Dialog open={showPhoneVerify} onOpenChange={setShowPhoneVerify}>
