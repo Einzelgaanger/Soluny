@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Clock, ChevronUp, ChevronDown, Loader2, Flame, Send, ArrowLeft, AlertCircle, Trophy } from "lucide-react";
+import { Clock, ThumbsUp, ThumbsDown, Loader2, Flame, Send, ArrowLeft, AlertCircle, Trophy } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { getRankConfig } from "@/lib/ranks";
 
@@ -66,12 +66,10 @@ const QuestionDetail = () => {
       const answerData = (aRes.data as AnswerData[]) || [];
       setAnswers(answerData);
 
-      // Check if user already answered
       if (user) {
         setHasAnswered(answerData.some((a) => a.author_id === user.id));
       }
 
-      // Fetch author profiles
       const authorIds = [...new Set(answerData.map((a) => a.author_id))];
       if (qRes.data) authorIds.push(qRes.data.author_id);
       if (authorIds.length > 0) {
@@ -86,7 +84,7 @@ const QuestionDetail = () => {
         }
       }
 
-      // Fetch user's votes
+      // Fetch user's existing votes
       if (user && answerData.length > 0) {
         const { data: votes } = await supabase
           .from("votes")
@@ -133,7 +131,6 @@ const QuestionDetail = () => {
       toast.success("Answer submitted!");
       setNewAnswer("");
       setHasAnswered(true);
-      // Send notification to question author
       try {
         await supabase.functions.invoke("send-notification", {
           body: { type: "new_answer", question_id: id, user_id: user.id },
@@ -141,45 +138,61 @@ const QuestionDetail = () => {
       } catch (e) {
         console.error("Notification failed:", e);
       }
-      // Refresh answers
       const { data } = await supabase.from("answers").select("*").eq("question_id", id).order("net_score", { ascending: false });
       setAnswers((data as AnswerData[]) || []);
     }
   };
 
   const handleVote = async (answerId: string, value: 1 | -1) => {
-    if (!user) return;
-    const currentVote = userVotes[answerId];
-    
-    if (currentVote === value) {
-      // Remove vote
-      const { error } = await supabase
-        .from("votes")
-        .delete()
-        .eq("voter_id", user.id)
-        .eq("answer_id", answerId);
-      if (!error) {
+    if (!user) {
+      toast.error("Sign in to vote");
+      return;
+    }
+    const currentVote = userVotes[answerId] || 0;
+
+    try {
+      if (currentVote === value) {
+        // Toggle off — delete vote
+        await supabase
+          .from("votes")
+          .delete()
+          .eq("voter_id", user.id)
+          .eq("answer_id", answerId);
+
         setUserVotes((prev) => {
           const next = { ...prev };
           delete next[answerId];
           return next;
         });
-        // Update local score
         setAnswers((prev) =>
           prev.map((a) =>
             a.id === answerId
-              ? { ...a, net_score: a.net_score - value, upvotes: value === 1 ? a.upvotes - 1 : a.upvotes, downvotes: value === -1 ? a.downvotes - 1 : a.downvotes }
+              ? {
+                  ...a,
+                  net_score: a.net_score - value,
+                  upvotes: value === 1 ? a.upvotes - 1 : a.upvotes,
+                  downvotes: value === -1 ? a.downvotes - 1 : a.downvotes,
+                }
               : a
           )
         );
-      }
-    } else {
-      const { error } = await supabase.from("votes").upsert(
-        { voter_id: user.id, answer_id: answerId, value },
-        { onConflict: "voter_id,answer_id" }
-      );
-      if (!error) {
-        const oldValue = currentVote || 0;
+      } else {
+        // Check if existing vote exists
+        if (currentVote !== 0) {
+          // Update existing vote
+          await supabase
+            .from("votes")
+            .update({ value, updated_at: new Date().toISOString() })
+            .eq("voter_id", user.id)
+            .eq("answer_id", answerId);
+        } else {
+          // Insert new vote
+          await supabase
+            .from("votes")
+            .insert({ voter_id: user.id, answer_id: answerId, value });
+        }
+
+        const oldValue = currentVote;
         setUserVotes((prev) => ({ ...prev, [answerId]: value }));
         setAnswers((prev) =>
           prev.map((a) => {
@@ -194,6 +207,9 @@ const QuestionDetail = () => {
           })
         );
       }
+    } catch (err) {
+      console.error("Vote error:", err);
+      toast.error("Failed to vote");
     }
   };
 
@@ -219,14 +235,12 @@ const QuestionDetail = () => {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto space-y-4 animate-fade-in">
-        {/* Back link */}
         <Link to="/dashboard/questions" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-3 w-3" /> Back to questions
         </Link>
 
         {/* Question card */}
         <div className="space-y-3 pb-4 border-b border-border/30">
-          {/* Meta row */}
           <div className="flex items-center gap-2 text-[10px]">
             {questionAuthor && (
               <div className="flex items-center gap-1.5">
@@ -249,21 +263,15 @@ const QuestionDetail = () => {
             <span className="text-muted-foreground">{formatDistanceToNow(new Date(question.created_at), { addSuffix: true })}</span>
           </div>
 
-          {/* Title */}
           <h1 className="text-base sm:text-lg font-bold tracking-tight leading-snug">{question.title}</h1>
-
-          {/* Body */}
           <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{question.body}</p>
 
-          {/* Status bar */}
           <div className="flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
               isOpen ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
             }`}>
               <Clock className="h-3 w-3" />
-              {isOpen
-                ? `${formatDistanceToNow(new Date(question.voting_closes_at))} left`
-                : "Closed"}
+              {isOpen ? `${formatDistanceToNow(new Date(question.voting_closes_at))} left` : "Closed"}
             </span>
             {Number(question.prize_pool_kes) > 0 && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold">
@@ -278,7 +286,7 @@ const QuestionDetail = () => {
           </div>
         </div>
 
-        {/* Answers section */}
+        {/* Answers */}
         <div className="space-y-1">
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{answers.length} Answers</h2>
 
@@ -294,54 +302,56 @@ const QuestionDetail = () => {
 
                 return (
                   <div key={a.id} className={`py-3 ${isTop ? "bg-primary/[0.03] -mx-1 px-1 rounded-lg" : ""}`}>
-                    {/* Answer header */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      {/* Vote column */}
-                      <div className="flex flex-col items-center gap-0 mr-1">
-                        <button
-                          onClick={() => handleVote(a.id, 1)}
-                          className={`p-0.5 rounded transition-colors ${myVote === 1 ? "text-success" : "text-muted-foreground hover:text-success"}`}
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </button>
-                        <span className={`text-xs font-mono font-bold ${a.net_score > 0 ? "text-success" : a.net_score < 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                          {a.net_score}
-                        </span>
-                        <button
-                          onClick={() => handleVote(a.id, -1)}
-                          className={`p-0.5 rounded transition-colors ${myVote === -1 ? "text-destructive" : "text-muted-foreground hover:text-destructive"}`}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        {/* Author info */}
-                        <div className="flex items-center gap-1.5 text-[10px]">
-                          {isTop && <Trophy className="h-3 w-3 text-primary" />}
-                          <div className="h-4 w-4 rounded-full bg-secondary overflow-hidden shrink-0">
-                            {author?.avatar_url ? (
-                              <img src={author.avatar_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[7px] font-bold text-muted-foreground">
-                                {(author?.display_name || "?")[0].toUpperCase()}
-                              </div>
-                            )}
+                    {/* Author info */}
+                    <div className="flex items-center gap-1.5 text-[10px] mb-1.5">
+                      {isTop && <Trophy className="h-3 w-3 text-primary" />}
+                      <div className="h-4 w-4 rounded-full bg-secondary overflow-hidden shrink-0">
+                        {author?.avatar_url ? (
+                          <img src={author.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[7px] font-bold text-muted-foreground">
+                            {(author?.display_name || "?")[0].toUpperCase()}
                           </div>
-                          <span className="font-medium">{author?.display_name || "Anonymous"}</span>
-                          <span className={`${rank.color}`}>{rank.animal}</span>
-                          <span className="text-muted-foreground">·</span>
-                          <span className="text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</span>
-                          {Number(a.earnings_awarded_kes) > 0 && (
-                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
-                              +KES {Number(a.earnings_awarded_kes).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Answer body */}
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap mt-1">{a.body}</p>
+                        )}
                       </div>
+                      <span className="font-medium">{author?.display_name || "Anonymous"}</span>
+                      <span className={rank.color}>{rank.animal}</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</span>
+                      {Number(a.earnings_awarded_kes) > 0 && (
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
+                          +KES {Number(a.earnings_awarded_kes).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Answer body */}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{a.body}</p>
+
+                    {/* Like / Unlike buttons */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleVote(a.id, 1)}
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-all ${
+                          myVote === 1
+                            ? "bg-success/15 text-success font-semibold"
+                            : "text-muted-foreground hover:bg-success/10 hover:text-success"
+                        }`}
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5" />
+                        <span>{a.upvotes}</span>
+                      </button>
+                      <button
+                        onClick={() => handleVote(a.id, -1)}
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-all ${
+                          myVote === -1
+                            ? "bg-destructive/15 text-destructive font-semibold"
+                            : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        }`}
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                        <span>{a.downvotes}</span>
+                      </button>
                     </div>
                   </div>
                 );
