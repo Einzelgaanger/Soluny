@@ -84,10 +84,44 @@ const Profile = () => {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
+
+    // Check username uniqueness
+    if (username) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("username", username)
+        .neq("user_id", user.id)
+        .maybeSingle();
+      if (existing) {
+        toast.error("This username is already taken");
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Check phone uniqueness
+    if (phone) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("phone_number", phone)
+        .neq("user_id", user.id)
+        .maybeSingle();
+      if (existing) {
+        toast.error("This phone number is already registered");
+        setSaving(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.from("profiles").update({ display_name: displayName, bio, phone_number: phone, username: username || null } as any).eq("user_id", user.id);
     setSaving(false);
-    if (error) toast.error(error.message);
-    else toast.success("Profile updated!");
+    if (error) {
+      if (error.message.includes("profiles_username_unique")) toast.error("This username is already taken");
+      else if (error.message.includes("profiles_phone_number_unique")) toast.error("This phone number is already registered");
+      else toast.error(error.message);
+    } else toast.success("Profile updated!");
   };
 
   const handlePasswordChange = async () => {
