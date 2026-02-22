@@ -39,17 +39,24 @@ const ChatInput = ({ onSend, onTyping, sending, userId }: ChatInputProps) => {
   const uploadVoice = async (blob: Blob) => {
     setUploading(true);
     try {
-      const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+      console.log("[ChatInput] uploading voice blob, size:", blob.size, "type:", blob.type);
+      // Determine extension from mime type
+      let ext = "webm";
+      if (blob.type.includes("mp4") || blob.type.includes("aac")) ext = "mp4";
+      else if (blob.type.includes("ogg")) ext = "ogg";
+
       const path = `${userId}/${Date.now()}-voice.${ext}`;
       const { error } = await supabase.storage.from("chat-attachments").upload(path, blob, {
-        contentType: blob.type,
+        contentType: blob.type || "audio/webm",
         cacheControl: "3600",
+        upsert: false,
       });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from("chat-attachments").getPublicUrl(path);
+      console.log("[ChatInput] voice uploaded:", urlData.publicUrl);
       onSend("", { url: urlData.publicUrl, type: "voice", name: "Voice note" });
     } catch (err) {
-      console.error("Voice upload failed:", err);
+      console.error("[ChatInput] Voice upload failed:", err);
     } finally {
       setUploading(false);
     }
