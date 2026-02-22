@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, Zap, Sun, Moon } from "lucide-react";
+import { Menu, X, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
+import solunyLogo from "@/assets/soluny-logo.png";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -12,10 +13,7 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="container flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
-            <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-          </div>
-          <span className="text-lg sm:text-xl font-bold tracking-tight text-gradient-gold">Soluny</span>
+          <img src={solunyLogo} alt="Soluny" className="h-8 sm:h-9 w-auto" />
         </Link>
 
         <div className="hidden md:flex items-center gap-6 lg:gap-8">

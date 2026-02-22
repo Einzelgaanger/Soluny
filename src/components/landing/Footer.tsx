@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Zap } from "lucide-react";
+import solunyLogo from "@/assets/soluny-logo.png";
 
 const Footer = () => (
   <footer className="border-t border-border/30 py-12 sm:py-16">
@@ -8,10 +8,7 @@ const Footer = () => (
         {/* Brand */}
         <div className="sm:col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 mb-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
-              <Zap className="h-4 w-4 text-primary" />
-            </div>
-            <span className="text-lg font-bold text-gradient-gold">Soluny</span>
+            <img src={solunyLogo} alt="Soluny" className="h-8 w-auto" />
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
             The subscription-based knowledge marketplace where your brainpower pays. Built for Kenya, designed for Africa.

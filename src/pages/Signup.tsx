@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Zap, Eye, EyeOff, Loader2, Shield, Award, Flame } from "lucide-react";
+import { Eye, EyeOff, Loader2, Shield, Award, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import authIllustration from "@/assets/auth-illustration.jpg";
+import solunyLogo from "@/assets/soluny-logo.png";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -54,10 +55,7 @@ const Signup = () => {
         <div className="relative z-10 flex flex-col justify-end p-12 pb-16">
           <div className="space-y-6 max-w-md">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 border border-primary/40">
-                <Zap className="h-5 w-5 text-primary" />
-              </div>
-              <span className="text-2xl font-bold text-gradient-gold">Soluny</span>
+              <img src={solunyLogo} alt="Soluny" className="h-10 w-auto" />
             </div>
             <h2 className="text-3xl font-bold tracking-tight leading-tight">
               Join thousands earning with their <span className="text-gradient-gold">knowledge</span>.
@@ -86,10 +84,7 @@ const Signup = () => {
           {/* Mobile logo */}
           <div className="text-center lg:hidden">
             <Link to="/" className="inline-flex items-center gap-2 mb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
-                <Zap className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-2xl font-bold text-gradient-gold">Soluny</span>
+              <img src={solunyLogo} alt="Soluny" className="h-10 w-auto" />
             </Link>
           </div>
 
