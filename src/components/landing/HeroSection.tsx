@@ -1,142 +1,201 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, TrendingUp, Users, Coins, Sparkles, Trophy, Flame, Swords, Crown } from "lucide-react";
+import { ArrowRight, TrendingUp, Users, Coins, Sparkles, Trophy, Flame, Swords, Crown, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import heroBg from "@/assets/hero-bg.jpg";
-import mouseImg from "@/assets/ranks/mouse.png";
-import foxImg from "@/assets/ranks/fox.png";
-import wolfImg from "@/assets/ranks/wolf.png";
-import eagleImg from "@/assets/ranks/eagle.png";
-import lionImg from "@/assets/ranks/lion.png";
-import dragonImg from "@/assets/ranks/dragon.png";
+import { motion } from "framer-motion";
+import heroBg from "@/assets/hero-bg-new.jpg";
+import mouseImg from "@/assets/ranks/mouse-hero.png";
+import foxImg from "@/assets/ranks/fox-hero.png";
+import wolfImg from "@/assets/ranks/wolf-hero.png";
+import eagleImg from "@/assets/ranks/eagle-hero.png";
+import lionImg from "@/assets/ranks/lion-hero.png";
+import dragonImg from "@/assets/ranks/dragon-hero.png";
 
 const ranks = [
-  { name: "Mouse", img: mouseImg, cp: "0+" },
-  { name: "Fox", img: foxImg, cp: "100+" },
-  { name: "Wolf", img: wolfImg, cp: "500+" },
-  { name: "Eagle", img: eagleImg, cp: "1,500+" },
-  { name: "Lion", img: lionImg, cp: "5,000+" },
-  { name: "Dragon", img: dragonImg, cp: "15,000+" },
+  { name: "Mouse", img: mouseImg, cp: "0+", glow: "from-blue-400/20 to-blue-600/5" },
+  { name: "Fox", img: foxImg, cp: "100+", glow: "from-orange-400/20 to-orange-600/5" },
+  { name: "Wolf", img: wolfImg, cp: "500+", glow: "from-slate-300/20 to-slate-500/5" },
+  { name: "Eagle", img: eagleImg, cp: "1,500+", glow: "from-amber-400/20 to-amber-600/5" },
+  { name: "Lion", img: lionImg, cp: "5,000+", glow: "from-yellow-400/20 to-yellow-600/5" },
+  { name: "Dragon", img: dragonImg, cp: "15,000+", glow: "from-red-400/20 to-red-600/5" },
 ];
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.12, duration: 0.6, ease: "easeOut" as const },
+  }),
+};
 
 const HeroSection = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
       {/* Background */}
       <div className="absolute inset-0">
-        <img src={heroBg} alt="" className="w-full h-full object-cover opacity-30" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/80 to-background" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-transparent to-background/50" />
+        <img src={heroBg} alt="" className="w-full h-full object-cover opacity-50" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
       </div>
 
       {/* Animated particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(8)].map((_, i) => (
-          <div
+        {[...Array(12)].map((_, i) => (
+          <motion.div
             key={i}
-            className="absolute rounded-full bg-primary/20 blur-xl"
+            className="absolute rounded-full bg-primary/30 blur-2xl"
             style={{
-              width: `${30 + i * 15}px`,
-              height: `${30 + i * 15}px`,
-              top: `${10 + i * 12}%`,
-              left: `${5 + i * 13}%`,
-              animation: `float ${3 + i}s ease-in-out infinite alternate`,
-              animationDelay: `${i * 0.4}s`,
+              width: `${20 + i * 12}px`,
+              height: `${20 + i * 12}px`,
+              top: `${8 + i * 8}%`,
+              left: `${3 + i * 9}%`,
+            }}
+            animate={{
+              y: [-10, -40, -10],
+              opacity: [0.2, 0.5, 0.2],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{
+              duration: 3 + i * 0.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: i * 0.3,
             }}
           />
         ))}
       </div>
 
-      <div className="container relative z-10 py-12 sm:py-16 lg:py-24 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto text-center space-y-6">
+      <div className="container relative z-10 py-8 sm:py-16 lg:py-20 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto text-center">
           {/* Live badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/5 text-primary text-xs font-bold animate-fade-in backdrop-blur-sm">
-            <Flame className="h-3.5 w-3.5" />
+          <motion.div
+            variants={fadeUp} initial="hidden" animate="visible" custom={0}
+            className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-primary/30 bg-primary/5 text-primary text-xs sm:text-sm font-bold backdrop-blur-md mb-6 sm:mb-8"
+          >
+            <Flame className="h-4 w-4 animate-pulse" />
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
             </span>
             KES 1.2M+ Paid Out — Join the Arena
-          </div>
+          </motion.div>
 
           {/* Heading */}
-          <h1 className="text-3xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight leading-[1.05] animate-slide-up">
-            Answer. Compete.{" "}
-            <span className="text-gradient-gold">Get Paid.</span>
-          </h1>
+          <motion.h1
+            variants={fadeUp} initial="hidden" animate="visible" custom={1}
+            className="text-4xl sm:text-6xl lg:text-8xl font-black tracking-tighter leading-[0.95] mb-4 sm:mb-6"
+          >
+            Answer. Compete.
+            <br />
+            <span className="text-gradient-gold relative">
+              Get Paid.
+              <motion.span
+                className="absolute -right-6 -top-2 sm:-right-8 sm:-top-4"
+                animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Zap className="h-5 w-5 sm:h-8 sm:w-8 text-primary drop-shadow-lg" />
+              </motion.span>
+            </span>
+          </motion.h1>
 
           {/* Subheading */}
-          <p className="text-sm sm:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto animate-slide-up stagger-1">
-            Soluny is the <strong className="text-foreground">competitive knowledge arena</strong> where your brainpower
+          <motion.p
+            variants={fadeUp} initial="hidden" animate="visible" custom={2}
+            className="text-sm sm:text-lg lg:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed"
+          >
+            The <strong className="text-foreground font-semibold">competitive knowledge arena</strong> where your brainpower
             earns real money. Post challenges, submit solutions, get voted by the community — and
-            climb the ranks from <span className="text-info">Mouse 🐭</span> to <span className="text-destructive">Dragon 🐉</span>.
-          </p>
+            climb from <span className="text-info font-semibold">Mouse</span> to <span className="text-destructive font-semibold">Dragon</span>.
+          </motion.p>
 
           {/* CTA */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up stagger-2">
+          <motion.div
+            variants={fadeUp} initial="hidden" animate="visible" custom={3}
+            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10 sm:mb-14"
+          >
             <Link to="/signup">
-              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-base sm:text-lg px-8 py-6 font-bold glow-gold rounded-xl">
+              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 font-bold glow-gold rounded-2xl shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-105">
                 Enter the Arena <Swords className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <a href="#ranks">
-              <Button size="lg" variant="outline" className="text-base sm:text-lg px-8 py-6 border-border/60 text-muted-foreground hover:text-foreground rounded-xl">
+              <Button size="lg" variant="outline" className="text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 border-border/40 text-muted-foreground hover:text-foreground rounded-2xl backdrop-blur-sm hover:bg-muted/10 transition-all">
                 View Ranks <Trophy className="ml-2 h-5 w-5" />
               </Button>
             </a>
-          </div>
+          </motion.div>
 
           {/* Stats bar */}
-          <div className="grid grid-cols-3 gap-3 max-w-md mx-auto pt-6 animate-slide-up stagger-3">
+          <motion.div
+            variants={fadeUp} initial="hidden" animate="visible" custom={4}
+            className="grid grid-cols-3 gap-3 sm:gap-5 max-w-lg mx-auto mb-12 sm:mb-16"
+          >
             {[
               { icon: Users, label: "Active Solvers", value: "2,500+" },
               { icon: Coins, label: "Prize Pools", value: "KES 1.2M" },
               { icon: TrendingUp, label: "Problems Solved", value: "8,400" },
-            ].map((s) => (
-              <div key={s.label} className="glass-card rounded-xl p-3 text-center backdrop-blur-sm">
-                <s.icon className="h-4 w-4 text-primary mx-auto mb-1" />
-                <div className="text-base sm:text-xl font-bold font-mono">{s.value}</div>
-                <div className="text-[8px] sm:text-[9px] text-muted-foreground uppercase tracking-wider">{s.label}</div>
-              </div>
+            ].map((s, i) => (
+              <motion.div
+                key={s.label}
+                whileHover={{ y: -4, scale: 1.02 }}
+                className="glass-card rounded-2xl p-4 sm:p-5 text-center backdrop-blur-md"
+              >
+                <s.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary mx-auto mb-2" />
+                <div className="text-lg sm:text-2xl lg:text-3xl font-black font-mono">{s.value}</div>
+                <div className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{s.label}</div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
-          {/* Rank parade — the gamification hook */}
-          <div id="ranks" className="pt-8 animate-slide-up stagger-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-4">Rank Up — Unlock Rewards</p>
-            <div className="flex items-end justify-center gap-2 sm:gap-4">
+          {/* Rank parade — BIG showcase */}
+          <motion.div
+            id="ranks"
+            variants={fadeUp} initial="hidden" animate="visible" custom={5}
+          >
+            <div className="flex items-center justify-center gap-2 mb-6 sm:mb-8">
+              <div className="h-px flex-1 max-w-20 bg-gradient-to-r from-transparent to-primary/30" />
+              <p className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-primary">
+                Rank Up — Unlock Rewards
+              </p>
+              <div className="h-px flex-1 max-w-20 bg-gradient-to-l from-transparent to-primary/30" />
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4 max-w-4xl mx-auto">
               {ranks.map((r, i) => (
-                <div key={r.name} className="flex flex-col items-center gap-1 group">
-                  <div className={`relative transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1`}>
-                    <img
-                      src={r.img}
-                      alt={r.name}
-                      className="rounded-xl object-cover border-2 border-border/40 group-hover:border-primary/50 transition-colors"
-                      style={{
-                        width: `${36 + i * 6}px`,
-                        height: `${36 + i * 6}px`,
-                      }}
-                    />
-                    {i === ranks.length - 1 && (
-                      <div className="absolute -top-1 -right-1">
-                        <Crown className="h-3.5 w-3.5 text-primary" />
-                      </div>
-                    )}
+                <motion.div
+                  key={r.name}
+                  whileHover={{ y: -8, scale: 1.05 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                  className="flex flex-col items-center gap-2 group"
+                >
+                  <div className={`relative p-1 rounded-2xl bg-gradient-to-b ${r.glow}`}>
+                    <div className="relative overflow-hidden rounded-xl border-2 border-border/30 group-hover:border-primary/50 transition-colors bg-background/50 backdrop-blur-sm">
+                      <img
+                        src={r.img}
+                        alt={r.name}
+                        className="w-20 h-20 sm:w-28 sm:h-28 lg:w-32 lg:h-32 object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                      {i === ranks.length - 1 && (
+                        <motion.div
+                          className="absolute top-1 right-1"
+                          animate={{ rotate: [0, 10, -10, 0] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-primary drop-shadow-lg" />
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-[9px] font-bold text-muted-foreground group-hover:text-foreground transition-colors">{r.name}</span>
-                  <span className="text-[7px] font-mono text-muted-foreground">{r.cp} CP</span>
-                </div>
+                  <div className="text-center">
+                    <span className="text-xs sm:text-sm font-bold text-muted-foreground group-hover:text-foreground transition-colors block">{r.name}</span>
+                    <span className="text-[9px] sm:text-[10px] font-mono text-muted-foreground/70">{r.cp} CP</span>
+                  </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes float {
-          from { transform: translateY(0px) scale(1); opacity: 0.3; }
-          to { transform: translateY(-30px) scale(1.1); opacity: 0.6; }
-        }
-      `}</style>
     </section>
   );
 };

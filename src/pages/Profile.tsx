@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/input-otp";
 
 const Profile = () => {
+  const isMobile = useIsMobile();
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [displayName, setDisplayName] = useState("");
@@ -447,8 +448,6 @@ const Profile = () => {
       </Button>
     </div>
   );
-
-  const isMobile = useIsMobile();
 
   return (
     <DashboardLayout>
