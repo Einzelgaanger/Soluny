@@ -22,64 +22,67 @@ const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Force load metadata on mount
+  // Create audio element imperatively to avoid React rendering issues
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.preload = "metadata";
+    audioRef.current = audio;
 
-    const onCanPlay = () => {
-      setLoading(false);
+    const onDuration = () => {
       if (audio.duration && isFinite(audio.duration)) {
         setDuration(audio.duration);
       }
     };
-    const onMeta = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
-      setLoading(false);
-    };
+    const onTimeUpdate = () => setProgress(audio.currentTime);
+    const onEnded = () => { setPlaying(false); setProgress(0); };
     const onError = () => {
-      console.error("[AudioPlayer] Failed to load:", url);
-      setError(true);
-      setLoading(false);
-    };
-    const onDurationChange = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
+      console.warn("[AudioPlayer] error loading audio, will try on play:", url);
     };
 
-    audio.addEventListener("canplaythrough", onCanPlay);
-    audio.addEventListener("loadedmetadata", onMeta);
-    audio.addEventListener("durationchange", onDurationChange);
+    audio.addEventListener("loadedmetadata", onDuration);
+    audio.addEventListener("durationchange", onDuration);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
 
-    // Trigger load
-    audio.load();
+    audio.src = url;
 
     return () => {
-      audio.removeEventListener("canplaythrough", onCanPlay);
-      audio.removeEventListener("loadedmetadata", onMeta);
-      audio.removeEventListener("durationchange", onDurationChange);
+      audio.pause();
+      audio.removeEventListener("loadedmetadata", onDuration);
+      audio.removeEventListener("durationchange", onDuration);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
+      audio.src = "";
+      audioRef.current = null;
     };
   }, [url]);
 
-  const toggle = () => {
-    if (!audioRef.current || error) return;
+  const toggle = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
     if (playing) {
-      audioRef.current.pause();
+      audio.pause();
       setPlaying(false);
     } else {
-      audioRef.current.play().then(() => setPlaying(true)).catch((e) => {
+      try {
+        // Re-set src if needed
+        if (!audio.src || audio.src !== url) audio.src = url;
+        await audio.play();
+        setPlaying(true);
+        // Get duration after play starts (some browsers only report it then)
+        if (audio.duration && isFinite(audio.duration)) {
+          setDuration(audio.duration);
+        }
+      } catch (e) {
         console.error("[AudioPlayer] play() failed:", e);
         setError(true);
-      });
+      }
     }
   };
 
@@ -115,23 +118,9 @@ const AudioPlayer = ({ url, isMe }: { url: string; isMe: boolean }) => {
 
   return (
     <div className="flex items-center gap-2.5 min-w-[200px] max-w-[260px]">
-      <audio
-        ref={audioRef}
-        src={url}
-        preload="auto"
-        onTimeUpdate={() => {
-          if (audioRef.current) setProgress(audioRef.current.currentTime);
-        }}
-        onEnded={() => {
-          setPlaying(false);
-          setProgress(0);
-        }}
-      />
       <button
         onClick={toggle}
-        disabled={loading}
         className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
-          loading ? "opacity-50" :
           isMe
             ? "bg-primary-foreground/20 hover:bg-primary-foreground/30"
             : "bg-primary/15 hover:bg-primary/25"
