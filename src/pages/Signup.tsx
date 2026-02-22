@@ -29,14 +29,14 @@ const Signup = () => {
       password,
       options: {
         data: { display_name: name },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: window.location.origin + "/dashboard",
       },
     });
     setLoading(false);
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Check your email to confirm your account!");
+      toast.success("Check your email to confirm your account! You'll be redirected to the dashboard after confirming.");
       navigate("/login");
     }
   };
@@ -96,70 +96,27 @@ const Signup = () => {
           <form onSubmit={handleSignup} className="glass-card rounded-2xl p-6 sm:p-8 space-y-5">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider">Display Name</Label>
-              <Input
-                id="name"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="h-12 bg-background/50 border-border/60 rounded-xl"
-              />
+              <Input id="name" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} required className="h-12 bg-background/50 border-border/60 rounded-xl" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-12 bg-background/50 border-border/60 rounded-xl"
-              />
+              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12 bg-background/50 border-border/60 rounded-xl" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider">Password</Label>
               <div className="relative">
-                <Input
-                  id="password"
-                  type={showPw ? "text" : "password"}
-                  placeholder="Min 6 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-12 bg-background/50 border-border/60 pr-12 rounded-xl"
-                />
-                <button
-                  type="button"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setShowPw(!showPw)}
-                >
+                <Input id="password" type={showPw ? "text" : "password"} placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 bg-background/50 border-border/60 pr-12 rounded-xl" />
+                <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" onClick={() => setShowPw(!showPw)}>
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {/* Password strength indicator */}
               <div className="flex gap-1 pt-1">
                 {[1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      password.length >= i * 3
-                        ? password.length >= 12
-                          ? "bg-success"
-                          : password.length >= 8
-                          ? "bg-primary"
-                          : "bg-warning"
-                        : "bg-muted"
-                    }`}
-                  />
+                  <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${password.length >= i * 3 ? password.length >= 12 ? "bg-success" : password.length >= 8 ? "bg-primary" : "bg-warning" : "bg-muted"}`} />
                 ))}
               </div>
             </div>
-            <Button
-              type="submit"
-              className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-base rounded-xl glow-gold"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-base rounded-xl glow-gold" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Create Account
             </Button>
@@ -167,9 +124,7 @@ const Signup = () => {
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline font-semibold">
-              Sign in
-            </Link>
+            <Link to="/login" className="text-primary hover:underline font-semibold">Sign in</Link>
           </p>
         </div>
       </div>
