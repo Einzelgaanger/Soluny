@@ -26,12 +26,12 @@ const DashboardSidebar = ({ collapsed, onToggle }: { collapsed: boolean; onToggl
   const unreadCount = useUnreadCount();
 
   const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", badge: 0 },
-    { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions", badge: 0 },
-    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount },
-    { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard", badge: 0 },
-    { icon: Wallet, label: "Earnings", path: "/dashboard/earnings", badge: 0 },
-    { icon: User, label: "Profile", path: "/dashboard/profile", badge: 0 },
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", badge: 0, exact: true },
+    { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions", badge: 0, exact: false },
+    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount, exact: false },
+    { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard", badge: 0, exact: false },
+    { icon: Wallet, label: "Earnings", path: "/dashboard/earnings", badge: 0, exact: false },
+    { icon: User, label: "Profile", path: "/dashboard/profile", badge: 0, exact: false },
   ];
 
   return (
@@ -48,7 +48,7 @@ const DashboardSidebar = ({ collapsed, onToggle }: { collapsed: boolean; onToggl
       {/* Nav */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+          const active = item.exact ? location.pathname === item.path : (location.pathname === item.path || location.pathname.startsWith(item.path + "/"));
           const btn = (
             <Link
               key={item.path}
