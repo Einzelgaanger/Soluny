@@ -13,18 +13,18 @@ const DashboardMobileNav = () => {
   const unreadCount = useUnreadCount();
 
   const navItems = [
-    { icon: LayoutDashboard, label: "Home", path: "/dashboard", badge: 0 },
-    { icon: MessageSquareText, label: "Q&A", path: "/dashboard/questions", badge: 0 },
-    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount },
-    { icon: Wallet, label: "Earn", path: "/dashboard/earnings", badge: 0 },
-    { icon: User, label: "Me", path: "/dashboard/profile", badge: 0 },
+    { icon: LayoutDashboard, label: "Home", path: "/dashboard", badge: 0, exact: true },
+    { icon: MessageSquareText, label: "Q&A", path: "/dashboard/questions", badge: 0, exact: false },
+    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount, exact: false },
+    { icon: Wallet, label: "Earn", path: "/dashboard/earnings", badge: 0, exact: false },
+    { icon: User, label: "Me", path: "/dashboard/profile", badge: 0, exact: false },
   ];
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/95 backdrop-blur-xl safe-area-bottom">
       <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
-          const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+          const active = item.exact ? location.pathname === item.path : (location.pathname === item.path || location.pathname.startsWith(item.path + "/"));
           return (
             <Link
               key={item.path}
