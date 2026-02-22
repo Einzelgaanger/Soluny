@@ -10,9 +10,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Loader2, Search, User, Users, Send, ArrowLeft,
   MessageSquare, Check, CheckCheck, Trophy, Coins, MessageSquareText,
+  Phone, Video,
 } from "lucide-react";
 import { getRankConfig } from "@/lib/ranks";
 import { formatDistanceToNow } from "date-fns";
+import ChatAvatar from "@/components/chat/ChatAvatar";
+import MessageBubble from "@/components/chat/MessageBubble";
+import ChatInput from "@/components/chat/ChatInput";
 
 interface Conversation {
   user_id: string;
@@ -31,12 +35,10 @@ export const useUpdateLastSeen = () => {
   const { user } = useAuth();
   useEffect(() => {
     if (!user) return;
-    // Also update DB for fallback
     const update = () => supabase.from("profiles").update({ last_seen: new Date().toISOString() }).eq("user_id", user.id);
     update();
     const interval = setInterval(update, 60000);
 
-    // Join global presence channel
     const channel = supabase.channel(PRESENCE_CHANNEL);
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
@@ -51,7 +53,6 @@ export const useUpdateLastSeen = () => {
   }, [user]);
 };
 
-// Hook to track who's online via presence
 export const useOnlineUsers = () => {
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
 
@@ -79,7 +80,6 @@ const isOnline = (lastSeen: string | null) => {
   return Date.now() - new Date(lastSeen).getTime() < 120000;
 };
 
-// ─── Unread count hook (exported for sidebar badge) ───
 export const useUnreadCount = () => {
   const { user } = useAuth();
   const [count, setCount] = useState(0);
@@ -107,45 +107,21 @@ export const useUnreadCount = () => {
   return count;
 };
 
-// ─── Avatar with online dot ──────────────────────────
-const AvatarWithStatus = ({ url, name, online, size = "md" }: { url?: string | null; name?: string; online?: boolean; size?: "sm" | "md" | "lg" | "xl" }) => {
-  const sizes = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12", xl: "h-16 w-16" };
-  const dotSizes = { sm: "h-2 w-2", md: "h-2.5 w-2.5", lg: "h-3 w-3", xl: "h-3.5 w-3.5" };
-  return (
-    <div className="relative shrink-0">
-      <div className={`${sizes[size]} rounded-xl bg-secondary overflow-hidden`}>
-        {url ? (
-          <img src={url} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-sm font-bold text-muted-foreground">
-            {(name || "?")[0].toUpperCase()}
-          </div>
-        )}
-      </div>
-      {online && (
-        <div className={`absolute -bottom-0.5 -right-0.5 ${dotSizes[size]} rounded-full border-2 border-background online-dot`} />
-      )}
-    </div>
-  );
-};
-
 // ─── Typing Indicator ─────────────────────────────────
-const TypingIndicator = () => (
-  <div className="flex justify-start">
-    <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-2.5 flex items-center gap-1">
+const TypingIndicator = ({ recipientProfile }: { recipientProfile?: any }) => (
+  <div className="flex justify-start mt-2">
+    {recipientProfile && (
+      <div className="mr-1.5 mt-auto mb-1">
+        <ChatAvatar url={recipientProfile.avatar_url} name={recipientProfile.display_name} size="sm" />
+      </div>
+    )}
+    <div className="bg-card border border-border/30 rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-1.5">
       <span className="typing-dot" />
       <span className="typing-dot" />
       <span className="typing-dot" />
     </div>
   </div>
 );
-
-// ─── Read Receipt Icons ───────────────────────────────
-const ReadReceipt = ({ sent, read }: { sent: boolean; read: boolean }) => {
-  if (read) return <CheckCheck className="h-3 w-3 text-info inline-block" />;
-  if (sent) return <Check className="h-3 w-3 text-muted-foreground/50 inline-block" />;
-  return null;
-};
 
 // ─── People Tab ────────────────────────────────────────
 const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; onViewProfile?: (id: string) => void; onlineIds?: Set<string> }) => {
@@ -181,12 +157,6 @@ const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; 
 
   const displayList = results.length > 0 ? results : topUsers;
 
-  const handleClick = (userId: string) => {
-    if (onViewProfile) {
-      onViewProfile(userId);
-    }
-  };
-
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -205,9 +175,7 @@ const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; 
         </Button>
       </div>
 
-      {results.length > 0 && (
-        <div className="text-xs text-muted-foreground">{results.length} result(s)</div>
-      )}
+      {results.length > 0 && <div className="text-xs text-muted-foreground">{results.length} result(s)</div>}
 
       {initialLoading ? (
         <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
@@ -222,7 +190,7 @@ const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; 
             const online = onlineIds ? onlineIds.has(p.user_id) : isOnline(p.last_seen);
             const content = (
               <div className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/5 rounded-lg transition-colors cursor-pointer">
-                <AvatarWithStatus url={p.avatar_url} name={p.display_name} online={online} size={isMobile ? "sm" : "md"} />
+                <ChatAvatar url={p.avatar_url} name={p.display_name} online={online} size={isMobile ? "sm" : "md"} />
                 <img src={rank.image} alt="" className="h-5 w-5 rounded object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -240,17 +208,12 @@ const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; 
 
             if (onViewProfile) {
               return (
-                <button key={p.user_id} onClick={() => handleClick(p.user_id)} className="w-full text-left">
+                <button key={p.user_id} onClick={() => onViewProfile(p.user_id)} className="w-full text-left">
                   {content}
                 </button>
               );
             }
-
-            return (
-              <Link key={p.user_id} to={`/dashboard/user/${p.user_id}`}>
-                {content}
-              </Link>
-            );
+            return <Link key={p.user_id} to={`/dashboard/user/${p.user_id}`}>{content}</Link>;
           })}
         </div>
       )}
@@ -258,7 +221,7 @@ const PeopleTab = ({ isMobile, onViewProfile, onlineIds }: { isMobile: boolean; 
   );
 };
 
-// ─── Inline Profile Panel (desktop) ───────────────────
+// ─── Profile Panel (desktop) ──────────────────────────
 const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessage: (id: string) => void; onClose: () => void }) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
@@ -300,9 +263,8 @@ const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessag
         </Link>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col items-center text-center gap-3">
-        <AvatarWithStatus url={profile.avatar_url} name={profile.display_name} online={online} size="xl" />
+        <ChatAvatar url={profile.avatar_url} name={profile.display_name} online={online} size="xl" />
         <div>
           <h2 className="text-base font-bold">{profile.display_name || "Anonymous"}</h2>
           {profile.username && <p className="text-xs text-muted-foreground">@{profile.username}</p>}
@@ -324,7 +286,6 @@ const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessag
         )}
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-xl bg-secondary/30 p-2.5 text-center">
           <MessageSquareText className="h-3.5 w-3.5 mx-auto mb-0.5 text-muted-foreground" />
@@ -343,7 +304,6 @@ const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessag
         </div>
       </div>
 
-      {/* Recent activity */}
       <div>
         <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Recent Questions</h3>
         {questions.length === 0 ? (
@@ -382,12 +342,11 @@ const ProfilePanel = ({ userId, onMessage, onClose }: { userId: string; onMessag
   );
 };
 
-// ─── Chat View (DM with a specific user) ──────────────
+// ─── Chat View ────────────────────────────────────────
 const ChatView = ({ recipientId, onBack, embedded, onlineIds }: { recipientId: string; onBack: () => void; embedded?: boolean; onlineIds?: Set<string> }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [messages, setMessages] = useState<any[]>([]);
-  const [newMsg, setNewMsg] = useState("");
   const [sending, setSending] = useState(false);
   const [recipientProfile, setRecipientProfile] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -468,11 +427,18 @@ const ChatView = ({ recipientId, onBack, embedded, onlineIds }: { recipientId: s
     }, 2000);
   }, [user, recipientId]);
 
-  const sendMessage = async () => {
-    if (!user || !newMsg.trim()) return;
+  const sendMessage = async (body: string, attachment?: { url: string; type: string; name: string }) => {
+    if (!user) return;
+    if (!body && !attachment) return;
     setSending(true);
-    await supabase.from("messages").insert({ sender_id: user.id, receiver_id: recipientId, body: newMsg.trim() });
-    setNewMsg("");
+    await supabase.from("messages").insert({
+      sender_id: user.id,
+      receiver_id: recipientId,
+      body: body || "",
+      attachment_url: attachment?.url || null,
+      attachment_type: attachment?.type || null,
+      attachment_name: attachment?.name || null,
+    });
     setSending(false);
     const channelName = `typing-${[user.id, recipientId].sort().join("-")}`;
     supabase.channel(channelName).track({ user_id: user.id, typing: false });
@@ -482,47 +448,51 @@ const ChatView = ({ recipientId, onBack, embedded, onlineIds }: { recipientId: s
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border/30 shrink-0 bg-background/80 backdrop-blur-sm z-10">
-        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-all">
+      {/* Header — clean, minimal */}
+      <div className="flex items-center gap-2 px-2 sm:px-3 py-2 border-b border-border/30 shrink-0 bg-background/95 backdrop-blur-sm">
+        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-all shrink-0">
           <ArrowLeft className="h-4 w-4" />
         </button>
         {recipientProfile && (
-          <Link to={`/dashboard/user/${recipientId}`} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity flex-1 min-w-0">
-            <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} online={online} size={isMobile ? "sm" : "md"} />
+          <Link to={`/dashboard/user/${recipientId}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-1 min-w-0">
+            <ChatAvatar url={recipientProfile.avatar_url} name={recipientProfile.display_name} online={online} size="sm" />
             <div className="min-w-0">
               <div className="text-sm font-semibold truncate">{recipientProfile.display_name || "Anonymous"}</div>
-              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                {recipientProfile.username && <span>@{recipientProfile.username}</span>}
-                {recipientProfile.username && <span>·</span>}
+              <div className="text-[10px] text-muted-foreground">
                 {online ? (
-                  <span className="flex items-center gap-1 text-success font-medium">
-                    <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                    Active now
-                  </span>
+                  <span className="text-success font-medium">online</span>
                 ) : (
                   <span>
                     {recipientProfile.last_seen
-                      ? `Last seen ${formatDistanceToNow(new Date(recipientProfile.last_seen), { addSuffix: true })}`
-                      : "Offline"}
+                      ? `last seen ${formatDistanceToNow(new Date(recipientProfile.last_seen), { addSuffix: true })}`
+                      : "offline"}
                   </span>
                 )}
               </div>
             </div>
           </Link>
         )}
+        {/* Call buttons (placeholder — coming soon) */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-foreground" disabled title="Coming soon">
+            <Phone className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-foreground" disabled title="Coming soon">
+            <Video className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Messages area with subtle pattern bg */}
-      <div className="flex-1 overflow-y-auto min-h-0 chat-bg-pattern">
-        <div className="py-4 px-2 space-y-2">
+      {/* Messages area — clean, edge-to-edge */}
+      <div className="flex-1 overflow-y-auto min-h-0 bg-background">
+        <div className="py-3 px-2 sm:px-3">
           {messages.length === 0 && (
             <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10 mb-3">
-                <MessageSquare className="h-7 w-7 text-primary/60" />
+              <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-primary/10 mb-3">
+                <MessageSquare className="h-6 w-6 text-primary/50" />
               </div>
               <p className="text-sm text-muted-foreground">No messages yet</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-1">Say hello to start a conversation ✨</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-1">Say hello ✨</p>
             </div>
           )}
           {messages.map((m: any, i: number) => {
@@ -530,87 +500,33 @@ const ChatView = ({ recipientId, onBack, embedded, onlineIds }: { recipientId: s
             const showDate = i === 0 || new Date(m.created_at).toDateString() !== new Date(messages[i - 1].created_at).toDateString();
             const isConsecutive = i > 0 && messages[i - 1].sender_id === m.sender_id && !showDate;
             return (
-              <div key={m.id}>
-                {showDate && (
-                  <div className="flex items-center justify-center py-3">
-                    <div className="px-3 py-1 rounded-full bg-secondary/60 backdrop-blur-sm text-[10px] text-muted-foreground font-medium">
-                      {new Date(m.created_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-                    </div>
-                  </div>
-                )}
-                <div className={`flex ${isMe ? "justify-end" : "justify-start"} ${isConsecutive ? "mt-0.5" : "mt-2"} group`}>
-                  {/* Incoming: show small avatar for first msg in group */}
-                  {!isMe && !isConsecutive && recipientProfile && (
-                    <div className="mr-2 mt-auto mb-1">
-                      <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} size="sm" />
-                    </div>
-                  )}
-                  {!isMe && isConsecutive && <div className="w-10 mr-2 shrink-0" />}
-                  <div className={`max-w-[70%] relative ${isMe ? "chat-bubble-sent" : "chat-bubble-received"}`}>
-                    <div className={`px-3.5 py-2 text-sm leading-relaxed ${
-                      isMe
-                        ? "bg-gradient-to-br from-primary to-primary/85 text-primary-foreground rounded-2xl rounded-br-sm shadow-[0_2px_8px_rgba(245,189,65,0.2)]"
-                        : "bg-card border border-border/40 text-foreground rounded-2xl rounded-bl-sm shadow-sm"
-                    }`}>
-                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                      <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
-                        <span className={`text-[9px] font-mono ${isMe ? "text-primary-foreground/40" : "text-muted-foreground/50"}`}>
-                          {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        {isMe && <ReadReceipt sent={true} read={m.read} />}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <MessageBubble
+                key={m.id}
+                message={m}
+                isMe={isMe}
+                showDate={showDate}
+                isConsecutive={isConsecutive}
+                recipientProfile={recipientProfile}
+              />
             );
           })}
-          {isTyping && (
-            <div className="flex justify-start mt-2">
-              {recipientProfile && (
-                <div className="mr-2 mt-auto mb-1">
-                  <AvatarWithStatus url={recipientProfile.avatar_url} name={recipientProfile.display_name} size="sm" />
-                </div>
-              )}
-              <div className="bg-card border border-border/40 rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-1.5 shadow-sm">
-                <span className="typing-dot" />
-                <span className="typing-dot" />
-                <span className="typing-dot" />
-              </div>
-            </div>
-          )}
+          {isTyping && <TypingIndicator recipientProfile={recipientProfile} />}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input bar */}
-      <div className={`flex items-center gap-2.5 pt-3 border-t border-border/30 shrink-0 bg-background/80 backdrop-blur-sm ${isMobile ? "pb-2" : ""}`}>
-        <div className="flex-1 relative">
-          <Input
-            value={newMsg}
-            onChange={(e) => {
-              setNewMsg(e.target.value);
-              broadcastTyping();
-            }}
-            placeholder="Type a message..."
-            className="h-10 text-sm bg-secondary/40 border-border/30 rounded-2xl pl-4 pr-4 focus-visible:ring-primary/30"
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-          />
-        </div>
-        <Button
-          onClick={sendMessage}
-          disabled={sending || !newMsg.trim()}
-          size="sm"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl h-10 w-10 p-0 shadow-[0_2px_8px_rgba(245,189,65,0.25)] transition-all hover:shadow-[0_4px_12px_rgba(245,189,65,0.35)] disabled:shadow-none"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
-      </div>
+      {/* Input */}
+      <ChatInput
+        onSend={sendMessage}
+        onTyping={broadcastTyping}
+        sending={sending}
+        userId={user?.id || ""}
+      />
     </div>
   );
 };
 
-// ─── Messages Tab (conversation list) ─────────────────
+// ─── Messages Tab ─────────────────────────────────────
 const MessagesTab = ({ isMobile, onOpenChat }: { isMobile: boolean; onOpenChat: (id: string) => void }) => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -635,7 +551,7 @@ const MessagesTab = ({ isMobile, onOpenChat }: { isMobile: boolean; onOpenChat: 
       msgs.forEach((m: any) => {
         const partnerId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
         if (!convMap.has(partnerId)) {
-          convMap.set(partnerId, { last_message: m.body, last_at: m.created_at, unread: !m.read && m.receiver_id === user.id ? 1 : 0 });
+          convMap.set(partnerId, { last_message: m.body || (m.attachment_type === "voice" ? "🎤 Voice note" : m.attachment_type === "image" ? "📷 Photo" : m.attachment_name ? `📎 ${m.attachment_name}` : m.body), last_at: m.created_at, unread: !m.read && m.receiver_id === user.id ? 1 : 0 });
         } else if (!m.read && m.receiver_id === user.id) {
           convMap.get(partnerId)!.unread++;
         }
@@ -691,7 +607,7 @@ const MessagesTab = ({ isMobile, onOpenChat }: { isMobile: boolean; onOpenChat: 
           <div className="text-[10px] font-bold uppercase text-muted-foreground px-1 mb-1">Start a conversation</div>
           {searchResults.map((p: any) => (
             <button key={p.user_id} onClick={() => onOpenChat(p.user_id)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/10 transition-colors text-left">
-              <AvatarWithStatus url={p.avatar_url} name={p.display_name} size="sm" />
+              <ChatAvatar url={p.avatar_url} name={p.display_name} size="sm" />
               <div>
                 <div className="text-sm font-medium">{p.display_name || "Anonymous"}</div>
                 {p.username && <div className="text-[10px] text-muted-foreground">@{p.username}</div>}
@@ -712,7 +628,7 @@ const MessagesTab = ({ isMobile, onOpenChat }: { isMobile: boolean; onOpenChat: 
         <div className="divide-y divide-border/20">
           {conversations.map((c) => (
             <button key={c.user_id} onClick={() => onOpenChat(c.user_id)} className="w-full flex items-center gap-3 py-2.5 px-1 hover:bg-muted/5 rounded-lg transition-colors text-left">
-              <AvatarWithStatus url={c.avatar_url} name={c.display_name} size={isMobile ? "sm" : "md"} />
+              <ChatAvatar url={c.avatar_url} name={c.display_name} size={isMobile ? "sm" : "md"} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold truncate">{c.display_name || "Anonymous"}</span>
@@ -777,7 +693,6 @@ const Community = () => {
 
   // ── MOBILE ──
   if (isMobile) {
-    // Full-screen chat on mobile
     if (chatUserId) {
       return (
         <DashboardLayout>
@@ -813,8 +728,7 @@ const Community = () => {
     );
   }
 
-  // ── DESKTOP: 2-panel with dynamic right side ──
-  // Right panel shows: profile if viewing, chat if chatting, otherwise messages list
+  // ── DESKTOP ──
   const rightPanelContent = () => {
     if (chatUserId) {
       return (
@@ -848,7 +762,6 @@ const Community = () => {
       <div className="animate-fade-in">
         <h1 className="text-xl font-bold tracking-tight mb-4">Community</h1>
         <div className="grid grid-cols-12 gap-4" style={{ height: "calc(100vh - 9rem)" }}>
-          {/* People panel */}
           <div className="col-span-5 glass-card rounded-2xl p-4 flex flex-col overflow-hidden">
             <div className="flex items-center gap-2 mb-3 shrink-0">
               <Users className="h-4 w-4 text-primary" />
@@ -858,9 +771,30 @@ const Community = () => {
               <PeopleTab isMobile={false} onViewProfile={viewProfile} onlineIds={onlineIds} />
             </div>
           </div>
-          {/* Right panel (messages / chat / profile) */}
-          <div className="col-span-7 glass-card rounded-2xl p-4 flex flex-col overflow-hidden">
-            {rightPanelContent()}
+          <div className="col-span-7 glass-card rounded-2xl p-0 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden p-0">
+              {chatUserId ? (
+                <ChatView recipientId={chatUserId} onBack={closeChat} embedded onlineIds={onlineIds} />
+              ) : (
+                <div className="p-4 flex flex-col h-full">
+                  {viewingProfileId ? (
+                    <div className="overflow-y-auto h-full pr-1">
+                      <ProfilePanel userId={viewingProfileId} onMessage={openChat} onClose={closeProfile} />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-3 shrink-0">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Messages</h2>
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        <MessagesTab isMobile={false} onOpenChat={openChat} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
