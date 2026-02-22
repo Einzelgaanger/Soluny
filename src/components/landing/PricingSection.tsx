@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Check, ShieldCheck, Zap, Activity, Cpu, Medal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import pricingBg from "@/assets/pricing-bg.jpg";
 import { motion } from "framer-motion";
 
 const plans = [
@@ -58,7 +59,12 @@ const plans = [
 
 const PricingSection = () => {
   return (
-    <section id="pricing" className="py-24 sm:py-32 relative overflow-hidden bg-background">
+    <section id="pricing" className="py-24 sm:py-32 relative overflow-hidden">
+      {/* Cinematic Background */}
+      <div className="absolute inset-0 z-0">
+        <img src={pricingBg} alt="" className="w-full h-full object-cover opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/75 to-background" />
+      </div>
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
 
       <div className="container px-4 sm:px-6 relative z-10">
