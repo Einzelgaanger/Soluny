@@ -11,7 +11,6 @@ import {
   Sun,
   Moon,
   Users,
-  Mail,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,7 +22,6 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions" },
   { icon: Users, label: "Community", path: "/dashboard/community" },
-  { icon: Mail, label: "Messages", path: "/dashboard/messages" },
   { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard" },
   { icon: Wallet, label: "Earnings", path: "/dashboard/earnings" },
   { icon: User, label: "Profile", path: "/dashboard/profile" },
