@@ -21,6 +21,9 @@ import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 import VerifyPhone from "./pages/VerifyPhone";
 import Subscribe from "./pages/Subscribe";
+import UserProfile from "./pages/UserProfile";
+import Messages from "./pages/Messages";
+import Community from "./pages/Community";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,10 @@ const App = () => (
               <Route path="/dashboard/profile" element={<Profile />} />
               <Route path="/dashboard/verify-phone" element={<VerifyPhone />} />
               <Route path="/dashboard/subscribe" element={<Subscribe />} />
+              <Route path="/dashboard/user/:userId" element={<UserProfile />} />
+              <Route path="/dashboard/messages" element={<Messages />} />
+              <Route path="/dashboard/messages/:recipientId" element={<Messages />} />
+              <Route path="/dashboard/community" element={<Community />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
