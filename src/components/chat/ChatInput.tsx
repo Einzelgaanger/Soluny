@@ -39,8 +39,12 @@ const ChatInput = ({ onSend, onTyping, sending, userId }: ChatInputProps) => {
   const uploadVoice = async (blob: Blob) => {
     setUploading(true);
     try {
-      const path = `${userId}/${Date.now()}-voice.webm`;
-      const { error } = await supabase.storage.from("chat-attachments").upload(path, blob);
+      const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+      const path = `${userId}/${Date.now()}-voice.${ext}`;
+      const { error } = await supabase.storage.from("chat-attachments").upload(path, blob, {
+        contentType: blob.type,
+        cacheControl: "3600",
+      });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from("chat-attachments").getPublicUrl(path);
       onSend("", { url: urlData.publicUrl, type: "voice", name: "Voice note" });
