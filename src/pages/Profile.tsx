@@ -22,6 +22,7 @@ const Profile = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,6 +51,7 @@ const Profile = () => {
         if (data) {
           setProfile(data);
           setDisplayName(data.display_name || "");
+          setUsername((data as any).username || "");
           setBio(data.bio || "");
           setPhone(data.phone_number || "");
         }
@@ -82,7 +84,7 @@ const Profile = () => {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({ display_name: displayName, bio, phone_number: phone }).eq("user_id", user.id);
+    const { error } = await supabase.from("profiles").update({ display_name: displayName, bio, phone_number: phone, username: username || null } as any).eq("user_id", user.id);
     setSaving(false);
     if (error) toast.error(error.message);
     else toast.success("Profile updated!");
@@ -148,6 +150,7 @@ const Profile = () => {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold">{displayName || "Anonymous"}</div>
+              {username && <div className="text-[9px] text-muted-foreground">@{username}</div>}
               <div className="text-[10px] text-muted-foreground">{user?.email}</div>
               <div className="flex items-center gap-2 mt-1">
                 <img src={rank.image} alt={rank.label} className="h-5 w-5 rounded object-cover" />
@@ -174,6 +177,10 @@ const Profile = () => {
             <div className="space-y-1">
               <Label className="text-[10px] font-bold uppercase tracking-wider">Display Name</Label>
               <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-8 text-xs bg-secondary/30 border-border/40 rounded-lg" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase tracking-wider">Username</Label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} placeholder="unique_username" className="h-8 text-xs bg-secondary/30 border-border/40 rounded-lg" />
             </div>
             <div className="space-y-1">
               <Label className="text-[10px] font-bold uppercase tracking-wider">Phone (M-Pesa)</Label>
@@ -306,6 +313,7 @@ const Profile = () => {
                   </div>
                 </div>
                 <h2 className="text-lg font-bold">{displayName || "Anonymous"}</h2>
+                {username && <p className="text-sm text-muted-foreground">@{username}</p>}
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
                 <div className="flex items-center justify-center gap-2 mt-2">
                   <img src={rank.image} alt={rank.label} className="h-6 w-6 rounded object-cover" />
@@ -366,6 +374,10 @@ const Profile = () => {
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold uppercase tracking-wider">Display Name</Label>
                   <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-10 bg-secondary/30 border-border/40 rounded-lg" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-wider">Username</Label>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} placeholder="unique_username" className="h-10 bg-secondary/30 border-border/40 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold uppercase tracking-wider">Phone (M-Pesa)</Label>

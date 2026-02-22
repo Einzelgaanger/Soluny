@@ -2,17 +2,17 @@ import { useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
   MessageSquareText,
-  Trophy,
+  Users,
   Wallet,
   User,
 } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Home", path: "/dashboard" },
-  { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions" },
-  { icon: Trophy, label: "Ranks", path: "/dashboard/leaderboard" },
+  { icon: MessageSquareText, label: "Q&A", path: "/dashboard/questions" },
+  { icon: Users, label: "Community", path: "/dashboard/community" },
   { icon: Wallet, label: "Earn", path: "/dashboard/earnings" },
-  { icon: User, label: "Profile", path: "/dashboard/profile" },
+  { icon: User, label: "Me", path: "/dashboard/profile" },
 ];
 
 const DashboardMobileNav = () => {
