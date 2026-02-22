@@ -368,7 +368,15 @@ export type Database = {
         | "opinion_poll"
         | "sponsored_challenge"
         | "knowledge_qa"
-      subscription_plan: "free" | "monthly" | "annual" | "institutional"
+      subscription_plan:
+        | "free"
+        | "monthly"
+        | "annual"
+        | "institutional"
+        | "bronze"
+        | "silver"
+        | "gold"
+        | "platinum"
       subscription_status: "free" | "active" | "expired" | "cancelled"
     }
     CompositeTypes: {
@@ -515,7 +523,16 @@ export const Constants = {
         "sponsored_challenge",
         "knowledge_qa",
       ],
-      subscription_plan: ["free", "monthly", "annual", "institutional"],
+      subscription_plan: [
+        "free",
+        "monthly",
+        "annual",
+        "institutional",
+        "bronze",
+        "silver",
+        "gold",
+        "platinum",
+      ],
       subscription_status: ["free", "active", "expired", "cancelled"],
     },
   },
