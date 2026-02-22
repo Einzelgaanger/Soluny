@@ -19,6 +19,8 @@ import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
+import VerifyPhone from "./pages/VerifyPhone";
+import Subscribe from "./pages/Subscribe";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +47,8 @@ const App = () => (
               <Route path="/dashboard/earnings" element={<Earnings />} />
               <Route path="/dashboard/leaderboard" element={<Leaderboard />} />
               <Route path="/dashboard/profile" element={<Profile />} />
+              <Route path="/dashboard/verify-phone" element={<VerifyPhone />} />
+              <Route path="/dashboard/subscribe" element={<Subscribe />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
