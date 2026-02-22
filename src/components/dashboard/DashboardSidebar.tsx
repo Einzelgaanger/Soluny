@@ -7,7 +7,6 @@ import {
   User,
   Settings,
   LogOut,
-  Zap,
   ChevronLeft,
   ChevronRight,
   Sun,
@@ -17,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import solunyLogo from "@/assets/soluny-logo.png";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -45,10 +45,7 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
     >
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 h-14 sm:h-16 border-b border-sidebar-border">
-        <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/30">
-          <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-        </div>
-        {!collapsed && <span className="text-lg font-bold text-gradient-gold">Soluny</span>}
+        <img src={solunyLogo} alt="Soluny" className={`h-7 sm:h-8 w-auto ${collapsed ? "mx-auto" : ""}`} />
       </div>
 
       {/* Nav */}
