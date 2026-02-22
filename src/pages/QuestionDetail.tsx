@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Clock, ThumbsUp, ThumbsDown, Loader2, Award, Flame, Send } from "lucide-react";
+import { Clock, ThumbsUp, ThumbsDown, Loader2, Flame, Send, ArrowLeft, AlertCircle, Trophy } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { getRankConfig } from "@/lib/ranks";
 
 interface QuestionData {
   id: string;
@@ -35,31 +36,79 @@ interface AnswerData {
   earnings_awarded_kes: number;
 }
 
+interface AuthorProfile {
+  user_id: string;
+  display_name: string | null;
+  rank: string;
+  avatar_url: string | null;
+}
+
 const QuestionDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [question, setQuestion] = useState<QuestionData | null>(null);
   const [answers, setAnswers] = useState<AnswerData[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, AuthorProfile>>({});
+  const [userVotes, setUserVotes] = useState<Record<string, number>>({});
   const [newAnswer, setNewAnswer] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [hasAnswered, setHasAnswered] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    const fetch = async () => {
+    const load = async () => {
       const [qRes, aRes] = await Promise.all([
         supabase.from("questions").select("*").eq("id", id).single(),
         supabase.from("answers").select("*").eq("question_id", id).order("net_score", { ascending: false }),
       ]);
       setQuestion(qRes.data as QuestionData | null);
-      setAnswers((aRes.data as AnswerData[]) || []);
+      const answerData = (aRes.data as AnswerData[]) || [];
+      setAnswers(answerData);
+
+      if (user) {
+        setHasAnswered(answerData.some((a) => a.author_id === user.id));
+      }
+
+      const authorIds = [...new Set(answerData.map((a) => a.author_id))];
+      if (qRes.data) authorIds.push(qRes.data.author_id);
+      if (authorIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, rank, avatar_url")
+          .in("user_id", authorIds);
+        if (profs) {
+          const map: Record<string, AuthorProfile> = {};
+          profs.forEach((p: any) => (map[p.user_id] = p));
+          setProfiles(map);
+        }
+      }
+
+      // Fetch user's existing votes
+      if (user && answerData.length > 0) {
+        const { data: votes } = await supabase
+          .from("votes")
+          .select("answer_id, value")
+          .eq("voter_id", user.id)
+          .in("answer_id", answerData.map((a) => a.id));
+        if (votes) {
+          const vMap: Record<string, number> = {};
+          votes.forEach((v: any) => (vMap[v.answer_id] = v.value));
+          setUserVotes(vMap);
+        }
+      }
+
       setLoading(false);
     };
-    fetch();
-  }, [id]);
+    load();
+  }, [id, user]);
 
   const submitAnswer = async () => {
     if (!user || !id) return;
+    if (hasAnswered) {
+      toast.error("You can only submit one answer per question");
+      return;
+    }
     if (newAnswer.length < 100) {
       toast.error("Answer must be at least 100 characters");
       return;
@@ -72,31 +121,102 @@ const QuestionDetail = () => {
     });
     setSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      if (error.message.includes("answers_question_author_unique")) {
+        toast.error("You've already answered this question");
+        setHasAnswered(true);
+      } else {
+        toast.error(error.message);
+      }
     } else {
       toast.success("Answer submitted!");
       setNewAnswer("");
+      setHasAnswered(true);
+      try {
+        await supabase.functions.invoke("send-notification", {
+          body: { type: "new_answer", question_id: id, user_id: user.id },
+        });
+      } catch (e) {
+        console.error("Notification failed:", e);
+      }
       const { data } = await supabase.from("answers").select("*").eq("question_id", id).order("net_score", { ascending: false });
       setAnswers((data as AnswerData[]) || []);
     }
   };
 
   const handleVote = async (answerId: string, value: 1 | -1) => {
-    if (!user) return;
-    const { error } = await supabase.from("votes").upsert(
-      { voter_id: user.id, answer_id: answerId, value },
-      { onConflict: "voter_id,answer_id" }
-    );
-    if (error) toast.error(error.message);
-    else toast.success(value === 1 ? "Upvoted!" : "Downvoted!");
+    if (!user) {
+      toast.error("Sign in to vote");
+      return;
+    }
+    const currentVote = userVotes[answerId] || 0;
+
+    try {
+      if (currentVote === value) {
+        // Toggle off — delete vote
+        await supabase
+          .from("votes")
+          .delete()
+          .eq("voter_id", user.id)
+          .eq("answer_id", answerId);
+
+        setUserVotes((prev) => {
+          const next = { ...prev };
+          delete next[answerId];
+          return next;
+        });
+        setAnswers((prev) =>
+          prev.map((a) =>
+            a.id === answerId
+              ? {
+                  ...a,
+                  net_score: a.net_score - value,
+                  upvotes: value === 1 ? a.upvotes - 1 : a.upvotes,
+                  downvotes: value === -1 ? a.downvotes - 1 : a.downvotes,
+                }
+              : a
+          )
+        );
+      } else {
+        // Check if existing vote exists
+        if (currentVote !== 0) {
+          // Update existing vote
+          await supabase
+            .from("votes")
+            .update({ value, updated_at: new Date().toISOString() })
+            .eq("voter_id", user.id)
+            .eq("answer_id", answerId);
+        } else {
+          // Insert new vote
+          await supabase
+            .from("votes")
+            .insert({ voter_id: user.id, answer_id: answerId, value });
+        }
+
+        const oldValue = currentVote;
+        setUserVotes((prev) => ({ ...prev, [answerId]: value }));
+        setAnswers((prev) =>
+          prev.map((a) => {
+            if (a.id !== answerId) return a;
+            let newUp = a.upvotes;
+            let newDown = a.downvotes;
+            if (oldValue === 1) newUp--;
+            if (oldValue === -1) newDown--;
+            if (value === 1) newUp++;
+            if (value === -1) newDown++;
+            return { ...a, upvotes: newUp, downvotes: newDown, net_score: newUp - newDown };
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Vote error:", err);
+      toast.error("Failed to vote");
+    }
   };
 
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       </DashboardLayout>
     );
   }
@@ -104,124 +224,172 @@ const QuestionDetail = () => {
   if (!question) {
     return (
       <DashboardLayout>
-        <div className="text-center py-20 text-muted-foreground">Question not found</div>
+        <div className="text-center py-16 text-muted-foreground text-sm">Question not found</div>
       </DashboardLayout>
     );
   }
 
   const isOpen = new Date(question.voting_closes_at) > new Date();
+  const questionAuthor = profiles[question.author_id];
 
   return (
     <DashboardLayout>
-      <div className="max-w-3xl mx-auto space-y-5 sm:space-y-6 animate-fade-in">
-        {/* Question */}
-        <div className="glass-card rounded-2xl p-5 sm:p-6 space-y-4">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold ${
-              isOpen ? "bg-success/15 text-success border border-success/30" : "bg-muted text-muted-foreground border border-border/40"
+      <div className="max-w-2xl mx-auto space-y-4 animate-fade-in">
+        <Link to="/dashboard/questions" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-3 w-3" /> Back to questions
+        </Link>
+
+        {/* Question card */}
+        <div className="space-y-3 pb-4 border-b border-border/30">
+          <div className="flex items-center gap-2 text-[10px]">
+            {questionAuthor && (
+              <div className="flex items-center gap-1.5">
+                <div className="h-5 w-5 rounded-full bg-secondary overflow-hidden">
+                  {questionAuthor.avatar_url ? (
+                    <img src={questionAuthor.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-muted-foreground">
+                      {(questionAuthor.display_name || "?")[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <span className="font-medium text-foreground">{questionAuthor.display_name || "Anonymous"}</span>
+                <span className={`${getRankConfig(questionAuthor.rank).color} font-semibold`}>
+                  {getRankConfig(questionAuthor.rank).animal}
+                </span>
+              </div>
+            )}
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">{formatDistanceToNow(new Date(question.created_at), { addSuffix: true })}</span>
+          </div>
+
+          <h1 className="text-base sm:text-lg font-bold tracking-tight leading-snug">{question.title}</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{question.body}</p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
+              isOpen ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
             }`}>
               <Clock className="h-3 w-3" />
-              {isOpen
-                ? `Voting closes ${formatDistanceToNow(new Date(question.voting_closes_at), { addSuffix: true })}`
-                : "Voting closed"}
+              {isOpen ? `${formatDistanceToNow(new Date(question.voting_closes_at))} left` : "Closed"}
             </span>
             {Number(question.prize_pool_kes) > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/15 text-primary border border-primary/30 font-semibold">
-                <Flame className="h-3 w-3" /> KES {Number(question.prize_pool_kes).toLocaleString()} pool
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold">
+                <Flame className="h-3 w-3" /> KES {Number(question.prize_pool_kes).toLocaleString()}
               </span>
             )}
+            {question.category_tags.map((tag) => (
+              <span key={tag} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-secondary/50 text-muted-foreground">
+                {tag}
+              </span>
+            ))}
           </div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight">{question.title}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{question.body}</p>
-          {question.category_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {question.category_tags.map((tag) => (
-                <span key={tag} className="px-2.5 py-0.5 rounded-lg text-[10px] font-medium bg-muted/50 text-muted-foreground">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Answers */}
-        <div>
-          <h2 className="text-base sm:text-lg font-bold mb-4">{answers.length} Answers</h2>
+        <div className="space-y-1">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{answers.length} Answers</h2>
+
           {answers.length === 0 ? (
-            <div className="glass-card rounded-2xl p-8 text-center text-muted-foreground">
-              No answers yet. Be the first to solve this!
-            </div>
+            <p className="text-sm text-muted-foreground py-6 text-center">No answers yet. Be the first!</p>
           ) : (
-            <div className="space-y-3">
-              {answers.map((a, i) => (
-                <div key={a.id} className={`glass-card rounded-2xl p-4 sm:p-5 space-y-3 ${
-                  i === 0 && a.net_score > 0 ? "border-primary/30 glow-gold" : ""
-                }`}>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    {i < 3 && a.net_score > 0 && (
-                      <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                        i === 0
-                          ? "bg-primary/20 text-primary border border-primary/40"
-                          : "bg-muted text-muted-foreground border border-border/40"
-                      }`}>
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
+            <div className="divide-y divide-border/20">
+              {answers.map((a, i) => {
+                const author = profiles[a.author_id];
+                const rank = author ? getRankConfig(author.rank) : getRankConfig("newcomer");
+                const myVote = userVotes[a.id] || 0;
+                const isTop = i === 0 && a.net_score > 0 && answers.length > 1;
+
+                return (
+                  <div key={a.id} className={`py-3 ${isTop ? "bg-primary/[0.03] -mx-1 px-1 rounded-lg" : ""}`}>
+                    {/* Author info */}
+                    <div className="flex items-center gap-1.5 text-[10px] mb-1.5">
+                      {isTop && <Trophy className="h-3 w-3 text-primary" />}
+                      <div className="h-4 w-4 rounded-full bg-secondary overflow-hidden shrink-0">
+                        {author?.avatar_url ? (
+                          <img src={author.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[7px] font-bold text-muted-foreground">
+                            {(author?.display_name || "?")[0].toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
-                    </span>
-                    {Number(a.earnings_awarded_kes) > 0 && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20 ml-auto">
-                        +KES {Number(a.earnings_awarded_kes).toLocaleString()}
-                      </span>
-                    )}
+                      <span className="font-medium">{author?.display_name || "Anonymous"}</span>
+                      <span className={rank.color}>{rank.animal}</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</span>
+                      {Number(a.earnings_awarded_kes) > 0 && (
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
+                          +KES {Number(a.earnings_awarded_kes).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Answer body */}
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{a.body}</p>
+
+                    {/* Like / Unlike buttons */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleVote(a.id, 1)}
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-all ${
+                          myVote === 1
+                            ? "bg-success/15 text-success font-semibold"
+                            : "text-muted-foreground hover:bg-success/10 hover:text-success"
+                        }`}
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5" />
+                        <span>{a.upvotes}</span>
+                      </button>
+                      <button
+                        onClick={() => handleVote(a.id, -1)}
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-all ${
+                          myVote === -1
+                            ? "bg-destructive/15 text-destructive font-semibold"
+                            : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        }`}
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                        <span>{a.downvotes}</span>
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{a.body}</p>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <button
-                      onClick={() => handleVote(a.id, 1)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-success transition-colors px-2.5 py-1.5 rounded-lg hover:bg-success/10"
-                    >
-                      <ThumbsUp className="h-4 w-4" /> {a.upvotes}
-                    </button>
-                    <button
-                      onClick={() => handleVote(a.id, -1)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors px-2.5 py-1.5 rounded-lg hover:bg-destructive/10"
-                    >
-                      <ThumbsDown className="h-4 w-4" /> {a.downvotes}
-                    </button>
-                    <span className="text-xs font-mono font-bold text-primary ml-auto">
-                      {a.net_score > 0 ? "+" : ""}{a.net_score}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Submit answer */}
-        {isOpen && (
-          <div className="glass-card rounded-2xl p-5 sm:p-6 space-y-4">
-            <h3 className="text-base font-bold">Your Answer</h3>
+        {isOpen && !hasAnswered && (
+          <div className="border-t border-border/30 pt-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Your Answer</h3>
             <Textarea
-              placeholder="Write a thoughtful solution (min 100 characters)..."
+              placeholder="Write a thoughtful solution (min 100 characters). You can only submit once!"
               value={newAnswer}
               onChange={(e) => setNewAnswer(e.target.value)}
-              rows={6}
-              className="bg-background/50 border-border/60 rounded-xl"
+              rows={4}
+              className="text-sm bg-secondary/30 border-border/40 rounded-lg resize-none"
             />
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{newAnswer.length}/5,000</span>
+              <span className="text-[10px] text-muted-foreground">{newAnswer.length}/5,000</span>
               <Button
                 onClick={submitAnswer}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl"
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs"
                 disabled={submitting}
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                Submit Answer
+                {submitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
+                Submit
               </Button>
             </div>
+          </div>
+        )}
+
+        {isOpen && hasAnswered && (
+          <div className="border-t border-border/30 pt-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-3.5 w-3.5" />
+            You've already submitted your answer to this question.
           </div>
         )}
       </div>

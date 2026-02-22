@@ -303,6 +303,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_streaks: {
+        Row: {
+          bonus_claimed_today: boolean
+          created_at: string
+          current_streak: number
+          id: string
+          last_login_date: string | null
+          longest_streak: number
+          total_logins: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bonus_claimed_today?: boolean
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_login_date?: string | null
+          longest_streak?: number
+          total_logins?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bonus_claimed_today?: boolean
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_login_date?: string | null
+          longest_streak?: number
+          total_logins?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       votes: {
         Row: {
           answer_id: string
@@ -368,7 +404,15 @@ export type Database = {
         | "opinion_poll"
         | "sponsored_challenge"
         | "knowledge_qa"
-      subscription_plan: "free" | "monthly" | "annual" | "institutional"
+      subscription_plan:
+        | "free"
+        | "monthly"
+        | "annual"
+        | "institutional"
+        | "bronze"
+        | "silver"
+        | "gold"
+        | "platinum"
       subscription_status: "free" | "active" | "expired" | "cancelled"
     }
     CompositeTypes: {
@@ -515,7 +559,16 @@ export const Constants = {
         "sponsored_challenge",
         "knowledge_qa",
       ],
-      subscription_plan: ["free", "monthly", "annual", "institutional"],
+      subscription_plan: [
+        "free",
+        "monthly",
+        "annual",
+        "institutional",
+        "bronze",
+        "silver",
+        "gold",
+        "platinum",
+      ],
       subscription_status: ["free", "active", "expired", "cancelled"],
     },
   },

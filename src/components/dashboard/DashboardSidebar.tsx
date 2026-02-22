@@ -10,8 +10,11 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -32,6 +35,7 @@ interface Props {
 const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
   const location = useLocation();
   const { signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <aside
@@ -80,6 +84,15 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
 
       {/* Bottom */}
       <div className="p-3 border-t border-sidebar-border space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-sidebar-foreground/60"
+          onClick={toggleTheme}
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+          {!collapsed && (theme === "dark" ? "Light Mode" : "Dark Mode")}
+        </Button>
         <Button
           variant="ghost"
           size="sm"

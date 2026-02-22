@@ -2,156 +2,314 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, MessageSquareText, Coins, Award, ArrowUpRight, Flame, Loader2 } from "lucide-react";
+import { TrendingUp, MessageSquareText, Coins, Flame, Loader2, Wallet, Crown, Zap, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { getRankConfig, getRankProgress, getSubTier } from "@/lib/ranks";
+import { toast } from "sonner";
 
-const rankConfig: Record<string, { color: string; next: string; cpNeeded: number }> = {
-  newcomer: { color: "text-muted-foreground", next: "Contributor", cpNeeded: 100 },
-  contributor: { color: "text-info", next: "Analyst", cpNeeded: 500 },
-  analyst: { color: "text-success", next: "Scholar", cpNeeded: 1500 },
-  scholar: { color: "text-primary", next: "Sage", cpNeeded: 5000 },
-  sage: { color: "text-warning", next: "Grand Master", cpNeeded: 15000 },
-  grand_master: { color: "text-primary", next: "MAX", cpNeeded: 99999 },
-};
+const STREAK_BONUSES = [
+  { day: 1, cp: 5, label: "Day 1" },
+  { day: 3, cp: 10, label: "3-Day" },
+  { day: 7, cp: 25, label: "Week" },
+  { day: 14, cp: 50, label: "2 Weeks" },
+  { day: 30, cp: 100, label: "Month" },
+];
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
+  const [streak, setStreak] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [claimingBonus, setClaimingBonus] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [answerCount, setAnswerCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
-        setProfile(data);
-        setLoading(false);
-      });
+
+    const loadAll = async () => {
+      // Load profile, streak, and counts in parallel
+      const [profileRes, streakRes, qCountRes, aCountRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", user.id).single(),
+        supabase.from("user_streaks").select("*").eq("user_id", user.id).single(),
+        supabase.from("questions").select("id", { count: "exact", head: true }).eq("author_id", user.id),
+        supabase.from("answers").select("id", { count: "exact", head: true }).eq("author_id", user.id),
+      ]);
+
+      setProfile(profileRes.data);
+      setQuestionCount(qCountRes.count || 0);
+      setAnswerCount(aCountRes.count || 0);
+
+      // Handle streak - create if doesn't exist
+      const today = new Date().toISOString().split("T")[0];
+
+      if (!streakRes.data) {
+        // Create streak record
+        const { data: newStreak } = await supabase
+          .from("user_streaks")
+          .insert({
+            user_id: user.id,
+            current_streak: 1,
+            longest_streak: 1,
+            last_login_date: today,
+            total_logins: 1,
+            bonus_claimed_today: false,
+          })
+          .select()
+          .single();
+        setStreak(newStreak);
+      } else {
+        const lastLogin = streakRes.data.last_login_date;
+        if (lastLogin !== today) {
+          // New day login
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+          const isConsecutive = lastLogin === yesterdayStr;
+          const newStreak = isConsecutive ? (streakRes.data.current_streak || 0) + 1 : 1;
+          const longestStreak = Math.max(newStreak, streakRes.data.longest_streak || 0);
+
+          const { data: updated } = await supabase
+            .from("user_streaks")
+            .update({
+              current_streak: newStreak,
+              longest_streak: longestStreak,
+              last_login_date: today,
+              total_logins: (streakRes.data.total_logins || 0) + 1,
+              bonus_claimed_today: false,
+            })
+            .eq("user_id", user.id)
+            .select()
+            .single();
+          setStreak(updated);
+        } else {
+          setStreak(streakRes.data);
+        }
+      }
+
+      setLoading(false);
+    };
+    loadAll();
   }, [user]);
+
+  const claimDailyBonus = async () => {
+    if (!user || !streak || streak.bonus_claimed_today) return;
+    setClaimingBonus(true);
+
+    // Calculate bonus CP based on streak
+    const currentDay = streak.current_streak || 1;
+    let bonusCP = 5; // base daily bonus
+    for (const bonus of STREAK_BONUSES) {
+      if (currentDay >= bonus.day) bonusCP = bonus.cp;
+    }
+
+    // Update profile CP and mark bonus claimed
+    const [, streakUpdate] = await Promise.all([
+      supabase
+        .from("profiles")
+        .update({ cp_balance: (profile?.cp_balance || 0) + bonusCP })
+        .eq("user_id", user.id),
+      supabase
+        .from("user_streaks")
+        .update({ bonus_claimed_today: true })
+        .eq("user_id", user.id)
+        .select()
+        .single(),
+    ]);
+
+    setStreak(streakUpdate.data);
+    setProfile((prev: any) => ({ ...prev, cp_balance: (prev?.cp_balance || 0) + bonusCP }));
+    toast.success(`+${bonusCP} CP daily bonus claimed! 🔥`);
+    setClaimingBonus(false);
+  };
 
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       </DashboardLayout>
     );
   }
 
-  const rank = profile?.rank || "newcomer";
+  const rank = getRankConfig(profile?.rank || "newcomer");
   const cp = profile?.cp_balance || 0;
-  const config = rankConfig[rank] || rankConfig.newcomer;
-  const cpProgress = Math.min((cp / config.cpNeeded) * 100, 100);
+  const cpProgress = getRankProgress(profile?.rank || "newcomer", cp);
+  const sub = getSubTier(profile?.subscription_plan || "free");
+  const currentStreak = streak?.current_streak || 0;
+  const bonusClaimed = streak?.bonus_claimed_today || false;
 
-  const stats = [
-    {
-      label: "Total Earnings",
-      value: `KES ${Number(profile?.total_earnings_kes || 0).toLocaleString()}`,
-      icon: Coins,
-      glow: "",
-    },
-    {
-      label: "CP Balance",
-      value: `${cp} CP`,
-      icon: Award,
-      glow: "glow-variant-info",
-    },
-    {
-      label: "Available",
-      value: `KES ${Number(profile?.available_balance_kes || 0).toLocaleString()}`,
-      icon: TrendingUp,
-      glow: "glow-variant-success",
-    },
-  ];
+  // Calculate today's bonus amount
+  let todayBonus = 5;
+  for (const bonus of STREAK_BONUSES) {
+    if (currentStreak >= bonus.day) todayBonus = bonus.cp;
+  }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 sm:space-y-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-4 animate-fade-in">
+        {/* Welcome header */}
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              Welcome back, <span className="text-gradient-gold">{profile?.display_name || user?.user_metadata?.display_name || "Solver"}</span>
+            <h1 className="text-lg font-bold tracking-tight">
+              Welcome, <span className="text-gradient-gold">{profile?.display_name || "Solver"}</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Here's your Soluny overview</p>
+            <p className="text-[11px] text-muted-foreground">Your Soluny command center</p>
           </div>
           <Link to="/dashboard/questions/new">
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl">
-              <Flame className="h-4 w-4 mr-2" /> Post Challenge
+            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs px-3">
+              <Flame className="h-3.5 w-3.5 mr-1" /> Post
             </Button>
           </Link>
         </div>
 
-        {/* Rank progress card */}
-        <div className="glass-card gradient-border rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-                <Award className={`h-6 w-6 ${config.color}`} />
+        {/* Streak + Daily bonus */}
+        <div className="glass-card rounded-xl p-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-primary/10 border border-primary/20">
+              <Flame className="h-5 w-5 text-primary" />
+              <span className="text-[10px] font-mono font-bold text-primary">{currentStreak}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold">
+                {currentStreak > 0 ? `${currentStreak}-day streak!` : "Start your streak!"}
               </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Rank</div>
-                <div className={`text-lg font-bold capitalize ${config.color}`}>{rank.replace("_", " ")}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {bonusClaimed ? "Bonus claimed today ✓" : `Claim +${todayBonus} CP daily bonus`}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground">Next: {config.next}</div>
-              <div className="text-sm font-mono font-bold">{cp}/{config.cpNeeded} CP</div>
+          </div>
+          {!bonusClaimed && (
+            <Button
+              onClick={claimDailyBonus}
+              size="sm"
+              disabled={claimingBonus}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs px-3 shrink-0"
+            >
+              {claimingBonus ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Zap className="h-3 w-3 mr-1" /> Claim</>}
+            </Button>
+          )}
+        </div>
+
+        {/* Rank card */}
+        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
+          <img src={rank.image} alt={rank.label} className="h-16 w-16 rounded-xl object-cover border-2 border-border/40" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-sm font-bold ${rank.color}`}>{rank.animal} {rank.label}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-mono">{cp} CP</span>
             </div>
-          </div>
-          {/* XP bar */}
-          <div className="h-3 rounded-full bg-muted/50 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-1000 ease-out"
-              style={{ width: `${cpProgress}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-2 text-[10px] text-muted-foreground uppercase tracking-wider">
-            <span>{rank.replace("_", " ")}</span>
-            <span>{config.next}</span>
+            <div className="h-2 rounded-full bg-secondary/50 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700"
+                style={{ width: `${cpProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-0.5 text-[9px] text-muted-foreground">
+              <span>{rank.label}</span>
+              <span>{rank.nextRank}</span>
+            </div>
           </div>
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          {stats.map((s) => (
-            <div key={s.label} className={`glass-card glass-card-hover stat-card-glow ${s.glow} rounded-2xl p-4 sm:p-5 space-y-2 sm:space-y-3`}>
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { label: "Balance", value: `KES ${Number(profile?.available_balance_kes || 0).toLocaleString()}`, icon: Wallet },
+            { label: "Earned", value: `KES ${Number(profile?.total_earnings_kes || 0).toLocaleString()}`, icon: Coins },
+            { label: "Questions", value: questionCount.toString(), icon: MessageSquareText },
+            { label: "Answers", value: answerCount.toString(), icon: TrendingUp },
+          ].map((s) => (
+            <div key={s.label} className="glass-card rounded-xl p-3 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">{s.label}</span>
-                <s.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{s.label}</span>
+                <s.icon className="h-3 w-3 text-muted-foreground" />
               </div>
-              <div className="text-xl sm:text-3xl font-bold font-mono tracking-tight">{s.value}</div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-success">
-                <ArrowUpRight className="h-3 w-3" />
-                <span>Active</span>
-              </div>
+              <div className="text-sm font-bold font-mono">{s.value}</div>
             </div>
           ))}
         </div>
 
+        {/* Subscription + Streak milestones */}
+        <div className="grid sm:grid-cols-2 gap-2">
+          {/* Plan info */}
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Your Plan</span>
+            </div>
+            <div className="text-sm font-bold mb-1">{sub.icon} {sub.name}</div>
+            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+              <div className="bg-secondary/30 rounded-lg px-2 py-1.5 text-center">
+                <div className="font-mono font-bold">{sub.limits.dailyAnswers >= 999 ? "∞" : sub.limits.dailyAnswers}</div>
+                <div className="text-muted-foreground">Answers/day</div>
+              </div>
+              <div className="bg-secondary/30 rounded-lg px-2 py-1.5 text-center">
+                <div className="font-mono font-bold">{sub.limits.platformFee}%</div>
+                <div className="text-muted-foreground">Fee</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Streak milestones */}
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Streak Bonuses</span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {STREAK_BONUSES.map((b) => {
+                const reached = currentStreak >= b.day;
+                return (
+                  <div
+                    key={b.day}
+                    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg min-w-[48px] text-[9px] ${
+                      reached ? "bg-primary/10 border border-primary/30" : "bg-secondary/30"
+                    }`}
+                  >
+                    <span className={`font-bold ${reached ? "text-primary" : "text-muted-foreground"}`}>{b.label}</span>
+                    <span className={`font-mono ${reached ? "text-foreground" : "text-muted-foreground"}`}>+{b.cp}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* Quick actions */}
-        <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
-          <Link to="/dashboard/questions" className="glass-card glass-card-hover rounded-2xl p-5 sm:p-6 flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-info/10 border border-info/20">
-              <MessageSquareText className="h-6 w-6 text-info" />
-            </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Link to="/dashboard/questions" className="glass-card glass-card-hover rounded-xl p-3 flex items-center gap-3">
+            <MessageSquareText className="h-5 w-5 text-info shrink-0" />
             <div>
-              <div className="font-bold">Browse Questions</div>
-              <div className="text-sm text-muted-foreground">Find challenges to solve and earn</div>
+              <div className="text-xs font-bold">Questions</div>
+              <div className="text-[10px] text-muted-foreground">Solve & earn</div>
             </div>
           </Link>
-          <Link to="/dashboard/leaderboard" className="glass-card glass-card-hover rounded-2xl p-5 sm:p-6 flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-              <Award className="h-6 w-6 text-primary" />
-            </div>
+          <Link to="/dashboard/leaderboard" className="glass-card glass-card-hover rounded-xl p-3 flex items-center gap-3">
+            <TrendingUp className="h-5 w-5 text-primary shrink-0" />
             <div>
-              <div className="font-bold">Leaderboard</div>
-              <div className="text-sm text-muted-foreground">See where you rank this month</div>
+              <div className="text-xs font-bold">Leaderboard</div>
+              <div className="text-[10px] text-muted-foreground">Your ranking</div>
             </div>
           </Link>
+        </div>
+
+        {/* Rank progression */}
+        <div className="glass-card rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Rank Progression</div>
+          <div className="flex items-center justify-between gap-1 overflow-x-auto pb-1">
+            {["newcomer", "contributor", "analyst", "scholar", "sage", "grand_master"].map((key) => {
+              const r = getRankConfig(key);
+              const isActive = key === (profile?.rank || "newcomer");
+              return (
+                <div key={key} className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg min-w-[52px] ${isActive ? "bg-primary/10 border border-primary/30" : ""}`}>
+                  <img src={r.image} alt={r.label} className={`h-8 w-8 rounded-lg object-cover ${isActive ? "" : "opacity-40 grayscale"}`} />
+                  <span className={`text-[8px] font-bold ${isActive ? r.color : "text-muted-foreground"}`}>{r.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </DashboardLayout>

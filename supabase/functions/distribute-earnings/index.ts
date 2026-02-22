@@ -7,10 +7,13 @@ const corsHeaders = {
 };
 
 /**
- * Earnings Distribution Engine
+ * Earnings Distribution Engine v2
  * 
- * Called when a question's voting period ends (status -> "closed").
- * Distributes the prize_pool_kes among top-ranked answers based on vote scores.
+ * - Takes a 12% platform fee (default) from the prize pool before distribution
+ * - Users on higher subscription tiers get lower fees (5-15%)
+ * - Distributes remaining pool among top-ranked answers by vote scores
+ * - Awards 10 CP per KES 100 earned
+ * - Enforces one answer per user per question (DB constraint)
  * 
  * Distribution tiers:
  * - 1 answer:  100% to #1
@@ -18,14 +21,24 @@ const corsHeaders = {
  * - 3+ answers: 50% to #1, 30% to #2, 20% to #3
  */
 
+// Platform fee by subscription plan
+const PLATFORM_FEE: Record<string, number> = {
+  free: 0.15,
+  bronze: 0.12,
+  silver: 0.10,
+  gold: 0.08,
+  platinum: 0.05,
+  monthly: 0.12,
+  annual: 0.10,
+  institutional: 0.08,
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // This can be called by a cron or admin — verify with service role or auth
-    const authHeader = req.headers.get("Authorization");
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -101,12 +114,11 @@ async function distributeForQuestion(
     .order("net_score", { ascending: false });
 
   if (!answers || answers.length === 0) {
-    // Close question with no winners
     await client
       .from("questions")
       .update({ status: "closed" })
       .eq("id", questionId);
-    return { question_id: questionId, distributed: 0, winners: 0 };
+    return { question_id: questionId, distributed: 0, platform_fee: 0, winners: 0 };
   }
 
   // Filter positive-score answers only
@@ -117,8 +129,30 @@ async function distributeForQuestion(
       .from("questions")
       .update({ status: "closed" })
       .eq("id", questionId);
-    return { question_id: questionId, distributed: 0, winners: 0 };
+    return { question_id: questionId, distributed: 0, platform_fee: 0, winners: 0 };
   }
+
+  // Calculate platform fee based on the question author's subscription
+  const { data: questionData } = await client
+    .from("questions")
+    .select("author_id")
+    .eq("id", questionId)
+    .single();
+
+  let feeRate = 0.12; // default
+  if (questionData) {
+    const { data: authorProfile } = await client
+      .from("profiles")
+      .select("subscription_plan")
+      .eq("user_id", questionData.author_id)
+      .single();
+    if (authorProfile) {
+      feeRate = PLATFORM_FEE[authorProfile.subscription_plan] || 0.12;
+    }
+  }
+
+  const platformFee = Math.round(prizePool * feeRate * 100) / 100;
+  const distributablePool = prizePool - platformFee;
 
   // Distribution tiers
   let shares: number[];
@@ -134,7 +168,7 @@ async function distributeForQuestion(
 
   for (let i = 0; i < winners; i++) {
     const answer = eligible[i];
-    const earning = Math.round(prizePool * shares[i] * 100) / 100;
+    const earning = Math.round(distributablePool * shares[i] * 100) / 100;
 
     if (earning <= 0) continue;
 
@@ -180,5 +214,44 @@ async function distributeForQuestion(
     .update({ status: "closed" })
     .eq("id", questionId);
 
-  return { question_id: questionId, distributed: prizePool, winners };
+  // Send email notifications to winners
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  for (let i = 0; i < winners; i++) {
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          type: "earnings_distributed",
+          user_id: eligible[i].author_id,
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to send earnings notification:", e);
+    }
+  }
+
+  // Send voting closed notification to question author
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        type: "voting_closed",
+        question_id: questionId,
+      }),
+    });
+  } catch (e) {
+    console.error("Failed to send voting closed notification:", e);
+  }
+
+  return { question_id: questionId, distributed: distributablePool, platform_fee: platformFee, winners };
 }

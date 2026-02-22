@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,10 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { User, Award, Loader2, Camera } from "lucide-react";
+import { User, Loader2, Camera, Settings, Sun, Moon } from "lucide-react";
+import { getRankConfig, getRankProgress, getSubTier } from "@/lib/ranks";
+import { useTheme } from "@/hooks/useTheme";
 
 const Profile = () => {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [phone, setPhone] = useState("");
@@ -51,75 +55,121 @@ const Profile = () => {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       </DashboardLayout>
     );
   }
 
-  const rank = profile?.rank || "newcomer";
+  const rank = getRankConfig(profile?.rank || "newcomer");
+  const cp = profile?.cp_balance || 0;
+  const cpProgress = getRankProgress(profile?.rank || "newcomer", cp);
+  const sub = getSubTier(profile?.subscription_plan || "free");
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Profile</h1>
+      <div className="max-w-xl mx-auto space-y-4 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold tracking-tight">Profile</h1>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleTheme} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <Link to="/dashboard/settings">
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                <Settings className="h-3.5 w-3.5" /> Subscription
+              </Button>
+            </Link>
+          </div>
+        </div>
 
-        {/* Avatar & rank header */}
-        <div className="glass-card gradient-border rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-5">
+        {/* Avatar & rank */}
+        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
           <div className="relative">
-            <div className="h-20 w-20 rounded-2xl bg-muted border-2 border-border/40 flex items-center justify-center overflow-hidden">
+            <div className="h-14 w-14 rounded-xl bg-secondary border border-border/40 flex items-center justify-center overflow-hidden">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
               ) : (
-                <User className="h-8 w-8 text-muted-foreground" />
+                <User className="h-6 w-6 text-muted-foreground" />
               )}
             </div>
-            <button className="absolute -bottom-1 -right-1 h-7 w-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-              <Camera className="h-3.5 w-3.5" />
+            <button className="absolute -bottom-1 -right-1 h-5 w-5 rounded bg-primary text-primary-foreground flex items-center justify-center">
+              <Camera className="h-3 w-3" />
             </button>
           </div>
-          <div className="text-center sm:text-left flex-1">
-            <div className="text-lg font-bold">{displayName || "Anonymous"}</div>
-            <div className="text-xs text-muted-foreground">{user?.email}</div>
-            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-xs font-semibold text-primary capitalize">
-              <Award className="h-3 w-3" /> {rank.replace("_", " ")}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold">{displayName || "Anonymous"}</div>
+            <div className="text-[10px] text-muted-foreground">{user?.email}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <img src={rank.image} alt={rank.label} className="h-5 w-5 rounded object-cover" />
+              <span className={`text-[10px] font-bold ${rank.color}`}>{rank.animal} {rank.label}</span>
+              <span className="text-[9px] px-1 py-0.5 rounded bg-secondary text-muted-foreground">{sub.icon} {sub.name}</span>
             </div>
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4">
-          <div className="glass-card rounded-2xl p-3 sm:p-4 text-center">
-            <div className="text-lg sm:text-xl font-bold font-mono">{profile?.cp_balance || 0}</div>
-            <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">CP Balance</div>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="glass-card rounded-xl p-2.5 text-center">
+            <div className="text-sm font-bold font-mono">{cp}</div>
+            <div className="text-[9px] text-muted-foreground">CP</div>
           </div>
-          <div className="glass-card rounded-2xl p-3 sm:p-4 text-center">
-            <div className="text-lg sm:text-xl font-bold font-mono">KES {Number(profile?.total_earnings_kes || 0).toLocaleString()}</div>
-            <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Total Earned</div>
+          <div className="glass-card rounded-xl p-2.5 text-center">
+            <div className="text-sm font-bold font-mono">KES {Number(profile?.total_earnings_kes || 0).toLocaleString()}</div>
+            <div className="text-[9px] text-muted-foreground">Earned</div>
           </div>
-          <div className="glass-card rounded-2xl p-3 sm:p-4 text-center">
-            <div className="text-lg sm:text-xl font-bold font-mono capitalize">{profile?.subscription_plan || "free"}</div>
-            <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Plan</div>
+          <div className="glass-card rounded-xl p-2.5 text-center">
+            <div className="text-sm font-bold font-mono">KES {Number(profile?.available_balance_kes || 0).toLocaleString()}</div>
+            <div className="text-[9px] text-muted-foreground">Balance</div>
+          </div>
+        </div>
+
+        {/* XP bar */}
+        <div className="glass-card rounded-xl p-3">
+          <div className="flex items-center justify-between text-[10px] mb-1">
+            <span className={`font-bold ${rank.color}`}>{rank.label}</span>
+            <span className="text-muted-foreground">{rank.nextRank}</span>
+          </div>
+          <div className="h-2 rounded-full bg-secondary/50 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700" style={{ width: `${cpProgress}%` }} />
           </div>
         </div>
 
         {/* Edit form */}
-        <div className="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider">Display Name</Label>
-            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-11 bg-background/50 border-border/60 rounded-xl" />
+        <div className="glass-card rounded-xl p-4 space-y-3">
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase tracking-wider">Display Name</Label>
+            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-8 text-xs bg-secondary/30 border-border/40 rounded-lg" />
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider">Phone (M-Pesa)</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="254..." className="h-11 bg-background/50 border-border/60 rounded-xl" />
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase tracking-wider">Phone (M-Pesa)</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="254..." className="h-8 text-xs bg-secondary/30 border-border/40 rounded-lg" />
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider">Bio</Label>
-            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className="bg-background/50 border-border/60 rounded-xl" placeholder="Tell the community about yourself..." />
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold uppercase tracking-wider">Bio</Label>
+            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="text-xs bg-secondary/30 border-border/40 rounded-lg resize-none" placeholder="Tell us about yourself..." />
           </div>
-          <Button onClick={handleSave} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl h-11" disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Save Changes
+          <Button onClick={handleSave} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-lg h-8 text-xs" disabled={saving}>
+            {saving && <Loader2 className="h-3 w-3 animate-spin mr-1" />} Save Changes
           </Button>
+        </div>
+
+        {/* Subscription summary on profile page */}
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold">Current Plan</span>
+            <span className={`text-xs font-bold ${sub.color}`}>{sub.icon} {sub.name}</span>
+          </div>
+          <ul className="space-y-1">
+            <li className="text-[10px] text-muted-foreground">• {sub.limits.dailyAnswers === 999 ? "Unlimited" : sub.limits.dailyAnswers} answers/day</li>
+            <li className="text-[10px] text-muted-foreground">• {sub.limits.questionsPerMonth === 999 ? "Unlimited" : sub.limits.questionsPerMonth} questions/month</li>
+            <li className="text-[10px] text-muted-foreground">• {sub.limits.platformFee}% platform fee</li>
+            <li className="text-[10px] text-muted-foreground">• KES {sub.limits.maxWithdrawal === 999999 ? "Unlimited" : sub.limits.maxWithdrawal.toLocaleString()} max withdrawal</li>
+          </ul>
+          <Link to="/dashboard/settings">
+            <Button variant="outline" size="sm" className="w-full mt-3 h-7 text-[10px]">
+              Manage Subscription →
+            </Button>
+          </Link>
         </div>
       </div>
     </DashboardLayout>
