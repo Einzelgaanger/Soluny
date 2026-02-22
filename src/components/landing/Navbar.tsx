@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, Zap } from "lucide-react";
+import { Menu, X, Zap, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/hooks/useTheme";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
@@ -23,6 +25,9 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
+          <button onClick={toggleTheme} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors">
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <Link to="/login">
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Log In</Button>
           </Link>
@@ -31,12 +36,16 @@ const Navbar = () => {
           </Link>
         </div>
 
-        <button className="md:hidden text-muted-foreground p-1" onClick={() => setOpen(!open)}>
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          <button onClick={toggleTheme} className="p-2 rounded-lg text-muted-foreground hover:text-foreground">
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <button className="text-muted-foreground p-1" onClick={() => setOpen(!open)}>
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile menu */}
       {open && (
         <div className="md:hidden border-t border-border/40 bg-background/98 backdrop-blur-xl animate-fade-in">
           <div className="container px-4 py-4 space-y-1">
