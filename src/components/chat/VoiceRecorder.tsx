@@ -58,19 +58,33 @@ const VoiceRecorder = ({ onRecorded, disabled }: VoiceRecorderProps) => {
 
   if (recording) {
     return (
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium animate-pulse">
-          <span className="h-2 w-2 rounded-full bg-destructive" />
-          {formatTime(duration)}
+      <div className="flex items-center gap-2 bg-destructive/5 border border-destructive/20 rounded-full px-2 py-1">
+        <span className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse shrink-0" />
+        {/* Live waveform bars */}
+        <div className="flex items-center gap-[2px] h-5">
+          {[4, 7, 3, 8, 5, 10, 6, 4, 7, 9, 5, 3].map((h, i) => (
+            <div
+              key={i}
+              className="w-[3px] rounded-full bg-destructive/60"
+              style={{
+                height: `${h * 1.5}px`,
+                animation: `pulse ${0.4 + (i % 3) * 0.2}s ease-in-out infinite alternate`,
+                animationDelay: `${i * 0.05}s`,
+              }}
+            />
+          ))}
         </div>
+        <span className="text-xs font-mono text-destructive font-medium tabular-nums min-w-[32px]">
+          {formatTime(duration)}
+        </span>
         <Button
           type="button"
           size="sm"
           variant="ghost"
           onClick={stopRecording}
-          className="h-8 w-8 p-0 rounded-full text-destructive hover:bg-destructive/10"
+          className="h-7 w-7 p-0 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 shrink-0"
         >
-          <Square className="h-4 w-4 fill-current" />
+          <Square className="h-3 w-3 fill-current" />
         </Button>
       </div>
     );
