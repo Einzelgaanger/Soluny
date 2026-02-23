@@ -710,6 +710,36 @@ export type Database = {
           },
         ]
       }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          note: string | null
+          receiver_id: string
+          sender_id: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          receiver_id: string
+          sender_id: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          receiver_id?: string
+          sender_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       withdrawal_settings: {
         Row: {
           cooldown_hours: number
@@ -756,6 +786,15 @@ export type Database = {
       increment_view_count: {
         Args: { question_id: string }
         Returns: undefined
+      }
+      transfer_funds: {
+        Args: {
+          p_amount: number
+          p_note?: string
+          p_receiver_id: string
+          p_type?: string
+        }
+        Returns: string
       }
     }
     Enums: {
