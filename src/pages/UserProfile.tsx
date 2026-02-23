@@ -4,11 +4,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MessageSquareText, Trophy, Coins, ArrowLeft, Send, User, UserPlus, UserCheck, Award, Users } from "lucide-react";
+import { Loader2, MessageSquareText, Trophy, Coins, ArrowLeft, Send, User, UserPlus, UserCheck, Award, BadgeCheck, Wallet } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getRankConfig } from "@/lib/ranks";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const UserProfile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -24,6 +27,12 @@ const UserProfile = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+
+  // Send money
+  const [showSendDialog, setShowSendDialog] = useState(false);
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendNote, setSendNote] = useState("");
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -45,14 +54,9 @@ const UserProfile = () => {
         setFollowingCount(profRes.data.following_count || 0);
       }
 
-      // Check if following
       if (user && userId !== user.id) {
         const { data: followData } = await supabase
-          .from("follows")
-          .select("id")
-          .eq("follower_id", user.id)
-          .eq("following_id", userId)
-          .maybeSingle();
+          .from("follows").select("id").eq("follower_id", user.id).eq("following_id", userId).maybeSingle();
         setIsFollowing(!!followData);
       }
 
@@ -76,6 +80,31 @@ const UserProfile = () => {
     }
   };
 
+  const handleSendMoney = async () => {
+    if (!user || !userId) return;
+    const amount = parseFloat(sendAmount);
+    if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
+    if (amount < 10) { toast.error("Minimum transfer is KES 10"); return; }
+
+    setSending(true);
+    const { error } = await supabase.rpc("transfer_funds", {
+      p_receiver_id: userId,
+      p_amount: amount,
+      p_type: "transfer",
+      p_note: sendNote || null,
+    });
+    setSending(false);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(`KES ${amount} sent to ${profile?.display_name || "user"}!`);
+      setShowSendDialog(false);
+      setSendAmount("");
+      setSendNote("");
+    }
+  };
+
   if (loading) {
     return <DashboardLayout><div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div></DashboardLayout>;
   }
@@ -86,6 +115,7 @@ const UserProfile = () => {
 
   const rank = getRankConfig(profile.rank || "newcomer");
   const isOwnProfile = user?.id === userId;
+  const isVerified = profile?.is_verified_expert;
 
   return (
     <DashboardLayout>
@@ -107,14 +137,16 @@ const UserProfile = () => {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className={`${isMobile ? "text-base" : "text-xl"} font-bold`}>{profile.display_name || "Anonymous"}</h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className={`${isMobile ? "text-base" : "text-xl"} font-bold`}>{profile.display_name || "Anonymous"}</h1>
+                {isVerified && <BadgeCheck className={`${isMobile ? "h-4 w-4" : "h-5 w-5"} text-primary`} />}
+              </div>
               {profile.username && <p className="text-xs lg:text-sm text-muted-foreground">@{profile.username}</p>}
               <div className="flex items-center gap-2 mt-1">
                 <img src={rank.image} alt={rank.label} className="h-5 w-5 lg:h-6 lg:w-6 rounded object-cover" />
                 <span className={`text-xs lg:text-sm font-bold ${rank.color}`}>{rank.label}</span>
                 <span className="text-xs font-mono text-muted-foreground">{profile.cp_balance} CP</span>
               </div>
-              {/* Follower stats */}
               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                 <span><strong className="text-foreground">{followerCount}</strong> followers</span>
                 <span><strong className="text-foreground">{followingCount}</strong> following</span>
@@ -141,6 +173,14 @@ const UserProfile = () => {
                 className="font-semibold rounded-lg h-8 text-xs gap-1.5 border-border/40"
               >
                 <Send className="h-3.5 w-3.5" /> Message
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowSendDialog(true)}
+                className="font-semibold rounded-lg h-8 text-xs gap-1.5 border-border/40"
+              >
+                <Wallet className="h-3.5 w-3.5" /> Send KES
               </Button>
             </div>
           )}
@@ -249,6 +289,42 @@ const UserProfile = () => {
           )}
         </div>
       </div>
+
+      {/* Send Money Dialog */}
+      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <DialogContent className="glass-card border-border/60 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Send Money</DialogTitle>
+            <DialogDescription className="text-xs">Transfer funds from your wallet to {profile?.display_name || "this user"}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider mb-1 block">Amount (KES)</Label>
+              <Input
+                type="number"
+                min="10"
+                value={sendAmount}
+                onChange={(e) => setSendAmount(e.target.value)}
+                placeholder="e.g. 100"
+                className="bg-secondary/30 border-border/40 rounded-xl"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Minimum KES 10</p>
+            </div>
+            <div>
+              <Label className="text-xs font-bold uppercase tracking-wider mb-1 block">Note (optional)</Label>
+              <Input
+                value={sendNote}
+                onChange={(e) => setSendNote(e.target.value)}
+                placeholder="e.g. Thanks for the great article!"
+                className="bg-secondary/30 border-border/40 rounded-xl"
+              />
+            </div>
+          </div>
+          <Button onClick={handleSendMoney} disabled={sending || !sendAmount} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs h-9 font-bold">
+            {sending && <Loader2 className="h-3 w-3 animate-spin mr-1" />} Send KES {sendAmount || "0"}
+          </Button>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

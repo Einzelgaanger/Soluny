@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   User, Loader2, Camera, Sun, Moon, LogOut, Lock, Check,
-  ChevronDown, ChevronUp, Shield, Phone,
+  ChevronDown, ChevronUp, Shield, Phone, Award, Users, BadgeCheck,
 } from "lucide-react";
 import { getRankConfig, getRankProgress, getSubTier, RANKS } from "@/lib/ranks";
 import { useTheme } from "@/hooks/useTheme";
+import ChatAvatar from "@/components/chat/ChatAvatar";
 
 const Profile = () => {
   const isMobile = useIsMobile();
@@ -40,23 +41,45 @@ const Profile = () => {
   // Ranks
   const [showRanks, setShowRanks] = useState(false);
 
+  // Social
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
+  const [badges, setBadges] = useState<any[]>([]);
+  const [showFollowers, setShowFollowers] = useState(false);
+  const [showFollowing, setShowFollowing] = useState(false);
+
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          setProfile(data);
-          setDisplayName(data.display_name || "");
-          setUsername((data as any).username || "");
-          setBio(data.bio || "");
-          setPhone(data.phone_number || "");
-        }
-        setLoading(false);
-      });
+    Promise.all([
+      supabase.from("profiles").select("*").eq("user_id", user.id).single(),
+      supabase.from("follows").select("following_id").eq("follower_id", user.id),
+      supabase.from("follows").select("follower_id").eq("following_id", user.id),
+      supabase.from("user_badges").select("*, badges(*)").eq("user_id", user.id).order("earned_at", { ascending: false }),
+    ]).then(async ([profRes, followingRes, followersRes, badgesRes]) => {
+      if (profRes.data) {
+        setProfile(profRes.data);
+        setDisplayName(profRes.data.display_name || "");
+        setUsername((profRes.data as any).username || "");
+        setBio(profRes.data.bio || "");
+        setPhone(profRes.data.phone_number || "");
+      }
+      setBadges(badgesRes.data || []);
+
+      // Fetch profiles for followers/following
+      const followingIds = (followingRes.data || []).map((f: any) => f.following_id);
+      const followerIds = (followersRes.data || []).map((f: any) => f.follower_id);
+
+      if (followingIds.length > 0) {
+        const { data } = await supabase.from("profiles").select("user_id, display_name, username, avatar_url, rank, is_verified_expert").in("user_id", followingIds);
+        setFollowing(data || []);
+      }
+      if (followerIds.length > 0) {
+        const { data } = await supabase.from("profiles").select("user_id, display_name, username, avatar_url, rank, is_verified_expert").in("user_id", followerIds);
+        setFollowers(data || []);
+      }
+
+      setLoading(false);
+    });
   }, [user]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,34 +108,13 @@ const Profile = () => {
     if (!user) return;
     setSaving(true);
 
-    // Check username uniqueness
     if (username) {
-      const { data: existing } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("username", username)
-        .neq("user_id", user.id)
-        .maybeSingle();
-      if (existing) {
-        toast.error("This username is already taken");
-        setSaving(false);
-        return;
-      }
+      const { data: existing } = await supabase.from("profiles").select("user_id").eq("username", username).neq("user_id", user.id).maybeSingle();
+      if (existing) { toast.error("This username is already taken"); setSaving(false); return; }
     }
-
-    // Check phone uniqueness
     if (phone) {
-      const { data: existing } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("phone_number", phone)
-        .neq("user_id", user.id)
-        .maybeSingle();
-      if (existing) {
-        toast.error("This phone number is already registered");
-        setSaving(false);
-        return;
-      }
+      const { data: existing } = await supabase.from("profiles").select("user_id").eq("phone_number", phone).neq("user_id", user.id).maybeSingle();
+      if (existing) { toast.error("This phone number is already registered"); setSaving(false); return; }
     }
 
     const { error } = await supabase.from("profiles").update({ display_name: displayName, bio, phone_number: phone, username: username || null } as any).eq("user_id", user.id);
@@ -135,11 +137,7 @@ const Profile = () => {
   };
 
   if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-      </DashboardLayout>
-    );
+    return <DashboardLayout><div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div></DashboardLayout>;
   }
 
   const rank = getRankConfig(profile?.rank || "newcomer");
@@ -147,19 +145,31 @@ const Profile = () => {
   const cpProgress = getRankProgress(profile?.rank || "newcomer", cp);
   const sub = getSubTier(profile?.subscription_plan || "free");
   const phoneVerified = !!profile?.phone_number;
+  const isVerified = profile?.is_verified_expert;
 
-  // Shared avatar renderer
   const avatarDim = isMobile ? "h-14 w-14" : "h-24 w-24";
   const avatarIconSize = isMobile ? "h-6 w-6" : "h-10 w-10";
   const camSize = isMobile ? "h-5 w-5" : "h-7 w-7";
   const camIconSize = isMobile ? "h-3 w-3" : "h-4 w-4";
+
+  const UserListItem = ({ p }: { p: any }) => (
+    <Link to={`/dashboard/user/${p.user_id}`} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-secondary/30 transition-colors">
+      <ChatAvatar url={p.avatar_url} name={p.display_name} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold truncate">{p.display_name || "Anonymous"}</span>
+          {p.is_verified_expert && <BadgeCheck className="h-3.5 w-3.5 text-primary shrink-0" />}
+        </div>
+        {p.username && <span className="text-[10px] text-muted-foreground">@{p.username}</span>}
+      </div>
+    </Link>
+  );
 
   return (
     <DashboardLayout>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
       {isMobile ? (
-        /* ================================ MOBILE ================================ */
         <div className="space-y-4 animate-fade-in pb-8">
           <h1 className="text-lg font-bold tracking-tight">My Profile</h1>
 
@@ -167,23 +177,18 @@ const Profile = () => {
           <div className="glass-card rounded-xl p-4 flex items-center gap-4">
             <div className="relative group">
               <div className={`${avatarDim} rounded-2xl bg-secondary border-2 border-border/40 flex items-center justify-center overflow-hidden`}>
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <User className={`${avatarIconSize} text-muted-foreground`} />
-                )}
-                {uploadingAvatar && (
-                  <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  </div>
-                )}
+                {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className={`${avatarIconSize} text-muted-foreground`} />}
+                {uploadingAvatar && <div className="absolute inset-0 bg-background/60 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
               </div>
-              <button onClick={() => fileInputRef.current?.click()} className={`absolute -bottom-1 -right-1 ${camSize} rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors`}>
+              <button onClick={() => fileInputRef.current?.click()} className={`absolute -bottom-1 -right-1 ${camSize} rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md`}>
                 {uploadingAvatar ? <Loader2 className={`${camIconSize} animate-spin`} /> : <Camera className={camIconSize} />}
               </button>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold">{displayName || "Anonymous"}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold">{displayName || "Anonymous"}</span>
+                {isVerified && <BadgeCheck className="h-4 w-4 text-primary" />}
+              </div>
               {username && <div className="text-[9px] text-muted-foreground">@{username}</div>}
               <div className="text-[10px] text-muted-foreground">{user?.email}</div>
               <div className="flex items-center gap-2 mt-1">
@@ -193,6 +198,49 @@ const Profile = () => {
               </div>
             </div>
           </div>
+
+          {/* Follower/Following stats */}
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => { setShowFollowers(!showFollowers); setShowFollowing(false); }} className="glass-card rounded-xl p-3 text-center hover:border-primary/20 transition-colors">
+              <div className="text-lg font-bold font-mono">{followers.length}</div>
+              <div className="text-[10px] text-muted-foreground">Followers</div>
+            </button>
+            <button onClick={() => { setShowFollowing(!showFollowing); setShowFollowers(false); }} className="glass-card rounded-xl p-3 text-center hover:border-primary/20 transition-colors">
+              <div className="text-lg font-bold font-mono">{following.length}</div>
+              <div className="text-[10px] text-muted-foreground">Following</div>
+            </button>
+          </div>
+
+          {/* Followers list */}
+          {showFollowers && (
+            <div className="glass-card rounded-xl p-3 space-y-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Followers</h3>
+              {followers.length === 0 ? <p className="text-xs text-muted-foreground text-center py-2">No followers yet</p> :
+                followers.map((p) => <UserListItem key={p.user_id} p={p} />)}
+            </div>
+          )}
+          {showFollowing && (
+            <div className="glass-card rounded-xl p-3 space-y-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Following</h3>
+              {following.length === 0 ? <p className="text-xs text-muted-foreground text-center py-2">Not following anyone yet</p> :
+                following.map((p) => <UserListItem key={p.user_id} p={p} />)}
+            </div>
+          )}
+
+          {/* Badges */}
+          {badges.length > 0 && (
+            <div className="glass-card rounded-xl p-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Award className="h-3.5 w-3.5" /> Badges</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {badges.map((ub: any) => (
+                  <div key={ub.id} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20">
+                    <Award className="h-3 w-3 text-primary" />
+                    <span className="text-[10px] font-bold text-primary">{ub.badges?.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* XP bar */}
           <div className="glass-card rounded-xl p-3">
@@ -248,9 +296,7 @@ const Profile = () => {
 
           {/* Security */}
           <div className="glass-card rounded-xl p-4 space-y-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Shield className="h-3.5 w-3.5" /> Security
-            </h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> Security</h2>
             <div className="flex items-center justify-between text-xs">
               <span>Email verified</span>
               <span className="text-success font-semibold flex items-center gap-1"><Check className="h-3 w-3" /> {user?.email}</span>
@@ -292,18 +338,15 @@ const Profile = () => {
             )}
           </div>
 
-          {/* Theme toggle */}
+          {/* Theme + Sign out */}
           <div className="glass-card rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {theme === "dark" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-              Theme
+              {theme === "dark" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />} Theme
             </div>
             <button onClick={toggleTheme} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 text-xs font-medium hover:bg-secondary transition-colors">
               {theme === "dark" ? <><Sun className="h-3.5 w-3.5" /> Light Mode</> : <><Moon className="h-3.5 w-3.5" /> Dark Mode</>}
             </button>
           </div>
-
-          {/* Sign out */}
           <Button onClick={signOut} variant="outline" size="sm" className="w-full text-xs h-9 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20">
             <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign Out
           </Button>
@@ -330,23 +373,18 @@ const Profile = () => {
                 <div className="flex justify-center mb-4">
                   <div className="relative group">
                     <div className={`${avatarDim} rounded-2xl bg-secondary border-2 border-border/40 flex items-center justify-center overflow-hidden`}>
-                      {profile?.avatar_url ? (
-                        <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <User className={`${avatarIconSize} text-muted-foreground`} />
-                      )}
-                      {uploadingAvatar && (
-                        <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                        </div>
-                      )}
+                      {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className={`${avatarIconSize} text-muted-foreground`} />}
+                      {uploadingAvatar && <div className="absolute inset-0 bg-background/60 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
                     </div>
                     <button onClick={() => fileInputRef.current?.click()} className={`absolute -bottom-1 -right-1 ${camSize} rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors`}>
                       {uploadingAvatar ? <Loader2 className={`${camIconSize} animate-spin`} /> : <Camera className={camIconSize} />}
                     </button>
                   </div>
                 </div>
-                <h2 className="text-lg font-bold">{displayName || "Anonymous"}</h2>
+                <div className="flex items-center justify-center gap-1.5">
+                  <h2 className="text-lg font-bold">{displayName || "Anonymous"}</h2>
+                  {isVerified && <BadgeCheck className="h-5 w-5 text-primary" />}
+                </div>
                 {username && <p className="text-sm text-muted-foreground">@{username}</p>}
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
                 <div className="flex items-center justify-center gap-2 mt-2">
@@ -354,6 +392,20 @@ const Profile = () => {
                   <span className={`text-sm font-bold ${rank.color}`}>{rank.label}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{sub.icon} {sub.name}</span>
                 </div>
+
+                {/* Follower/Following stats */}
+                <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-border/20">
+                  <button onClick={() => { setShowFollowers(!showFollowers); setShowFollowing(false); }} className="text-center hover:text-primary transition-colors">
+                    <div className="text-lg font-bold font-mono">{followers.length}</div>
+                    <div className="text-[10px] text-muted-foreground">Followers</div>
+                  </button>
+                  <button onClick={() => { setShowFollowing(!showFollowing); setShowFollowers(false); }} className="text-center hover:text-primary transition-colors">
+                    <div className="text-lg font-bold font-mono">{following.length}</div>
+                    <div className="text-[10px] text-muted-foreground">Following</div>
+                  </button>
+                </div>
+
+                {/* XP bar */}
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className={`font-bold ${rank.color}`}>{rank.label}</span>
@@ -366,11 +418,40 @@ const Profile = () => {
                 </div>
               </div>
 
+              {/* Followers/Following lists */}
+              {showFollowers && (
+                <div className="glass-card rounded-2xl p-4 space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Followers</h3>
+                  {followers.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No followers yet</p> :
+                    followers.map((p) => <UserListItem key={p.user_id} p={p} />)}
+                </div>
+              )}
+              {showFollowing && (
+                <div className="glass-card rounded-2xl p-4 space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Following</h3>
+                  {following.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">Not following anyone yet</p> :
+                    following.map((p) => <UserListItem key={p.user_id} p={p} />)}
+                </div>
+              )}
+
+              {/* Badges */}
+              {badges.length > 0 && (
+                <div className="glass-card rounded-2xl p-5">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5"><Award className="h-4 w-4" /> Badges</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {badges.map((ub: any) => (
+                      <div key={ub.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+                        <Award className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-[11px] font-bold text-primary">{ub.badges?.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Security */}
               <div className="glass-card rounded-2xl p-5 space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Shield className="h-4 w-4" /> Security
-                </h2>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2"><Shield className="h-4 w-4" /> Security</h2>
                 <div className="flex items-center justify-between text-sm">
                   <span>Email</span>
                   <span className="text-success font-semibold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Verified</span>
@@ -380,9 +461,7 @@ const Profile = () => {
                   {phoneVerified ? (
                     <span className="text-success font-semibold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {phone}</span>
                   ) : (
-                    <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => navigate("/dashboard/verify-phone")}>
-                      <Phone className="h-3 w-3 mr-1" /> Verify
-                    </Button>
+                    <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => navigate("/dashboard/verify-phone")}><Phone className="h-3 w-3 mr-1" /> Verify</Button>
                   )}
                 </div>
                 <button onClick={() => setShowPasswordSection(!showPasswordSection)} className="flex items-center justify-between w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors pt-2 border-t border-border/30">

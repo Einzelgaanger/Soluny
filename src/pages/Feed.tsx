@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, Heart, MessageSquare, Eye, Plus, TrendingUp, Clock, Users,
-  BookOpen, Video, Image, FileText, HelpCircle, Flame,
+  BookOpen, Video, Image, FileText, HelpCircle, Flame, BadgeCheck,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ChatAvatar from "@/components/chat/ChatAvatar";
@@ -135,7 +135,7 @@ const Feed = () => {
     if (authorIds.length > 0) {
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("user_id, display_name, username, avatar_url, rank")
+        .select("user_id, display_name, username, avatar_url, rank, is_verified_expert")
         .in("user_id", authorIds);
       const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
       all.forEach((item) => {
@@ -235,6 +235,7 @@ const Feed = () => {
                           {profile?.display_name || "Anonymous"}
                         </Link>
                         {rank && <img src={rank.image} alt="" className="h-4 w-4 rounded object-cover" />}
+                        {profile?.is_verified_expert && <BadgeCheck className="h-3.5 w-3.5 text-primary shrink-0" />}
                         <span className="text-[10px] text-muted-foreground">@{profile?.username || "user"}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
