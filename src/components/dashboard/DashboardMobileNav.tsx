@@ -3,7 +3,7 @@ import {
   LayoutDashboard,
   MessageSquareText,
   Users,
-  Wallet,
+  BookOpen,
   User,
 } from "lucide-react";
 import { useUnreadCount } from "@/pages/Community";
@@ -14,9 +14,9 @@ const DashboardMobileNav = () => {
 
   const navItems = [
     { icon: LayoutDashboard, label: "Home", path: "/dashboard", badge: 0, exact: true },
+    { icon: BookOpen, label: "Feed", path: "/dashboard/feed", badge: 0, exact: false },
     { icon: MessageSquareText, label: "Q&A", path: "/dashboard/questions", badge: 0, exact: false },
-    { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount, exact: false },
-    { icon: Wallet, label: "Earn", path: "/dashboard/earnings", badge: 0, exact: false },
+    { icon: Users, label: "Chat", path: "/dashboard/community", badge: unreadCount, exact: false },
     { icon: User, label: "Me", path: "/dashboard/profile", badge: 0, exact: false },
   ];
 

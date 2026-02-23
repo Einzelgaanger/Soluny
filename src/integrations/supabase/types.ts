@@ -67,6 +67,80 @@ export type Database = {
           },
         ]
       }
+      badges: {
+        Row: {
+          category: Database["public"]["Enums"]["badge_category"]
+          color: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          threshold: number
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["badge_category"]
+          color?: string
+          created_at?: string
+          description: string
+          icon?: string
+          id?: string
+          name: string
+          threshold?: number
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["badge_category"]
+          color?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          threshold?: number
+        }
+        Relationships: []
+      }
+      content_earnings: {
+        Row: {
+          amount_kes: number
+          author_id: string
+          created_at: string
+          id: string
+          period_end: string
+          period_start: string
+          post_id: string
+          views_counted: number
+        }
+        Insert: {
+          amount_kes?: number
+          author_id: string
+          created_at?: string
+          id?: string
+          period_end: string
+          period_start: string
+          post_id: string
+          views_counted?: number
+        }
+        Update: {
+          amount_kes?: number
+          author_id?: string
+          created_at?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          post_id?: string
+          views_counted?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_earnings_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       earnings: {
         Row: {
           amount_kes: number
@@ -138,6 +212,27 @@ export type Database = {
           reporter_id?: string
           resolved_at?: string | null
           status?: string
+        }
+        Relationships: []
+      }
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
         }
         Relationships: []
       }
@@ -246,6 +341,134 @@ export type Database = {
         }
         Relationships: []
       }
+      post_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+          like_count: number
+          parent_id: string | null
+          post_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          id?: string
+          like_count?: number
+          parent_id?: string | null
+          post_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          like_count?: number
+          parent_id?: string | null
+          post_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          author_id: string
+          body: string
+          comment_count: number
+          cover_image_url: string | null
+          created_at: string
+          id: string
+          is_published: boolean
+          like_count: number
+          media_urls: string[] | null
+          tags: string[] | null
+          title: string
+          type: Database["public"]["Enums"]["post_type"]
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          author_id: string
+          body?: string
+          comment_count?: number
+          cover_image_url?: string | null
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          like_count?: number
+          media_urls?: string[] | null
+          tags?: string[] | null
+          title: string
+          type?: Database["public"]["Enums"]["post_type"]
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          comment_count?: number
+          cover_image_url?: string | null
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          like_count?: number
+          media_urls?: string[] | null
+          tags?: string[] | null
+          title?: string
+          type?: Database["public"]["Enums"]["post_type"]
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           available_balance_kes: number
@@ -255,6 +478,8 @@ export type Database = {
           created_at: string
           display_name: string | null
           expert_category: string | null
+          follower_count: number
+          following_count: number
           id: string
           is_verified_expert: boolean
           last_seen: string | null
@@ -277,6 +502,8 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           expert_category?: string | null
+          follower_count?: number
+          following_count?: number
           id?: string
           is_verified_expert?: boolean
           last_seen?: string | null
@@ -299,6 +526,8 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           expert_category?: string | null
+          follower_count?: number
+          following_count?: number
           id?: string
           is_verified_expert?: boolean
           last_seen?: string | null
@@ -362,6 +591,35 @@ export type Database = {
           voting_closes_at?: string
         }
         Relationships: []
+      }
+      user_badges: {
+        Row: {
+          badge_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "badges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -494,6 +752,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_post_views: { Args: { p_post_id: string }; Returns: undefined }
       increment_view_count: {
         Args: { question_id: string }
         Returns: undefined
@@ -501,6 +760,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      badge_category:
+        | "followers"
+        | "content"
+        | "earnings"
+        | "streak"
+        | "special"
       community_rank:
         | "newcomer"
         | "contributor"
@@ -509,6 +774,12 @@ export type Database = {
         | "sage"
         | "grand_master"
       payout_status: "pending" | "processing" | "completed" | "failed"
+      post_type:
+        | "article"
+        | "video"
+        | "image_post"
+        | "research_paper"
+        | "discussion"
       question_status: "open" | "voting" | "closed" | "removed"
       question_type:
         | "problem"
@@ -654,6 +925,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      badge_category: ["followers", "content", "earnings", "streak", "special"],
       community_rank: [
         "newcomer",
         "contributor",
@@ -663,6 +935,13 @@ export const Constants = {
         "grand_master",
       ],
       payout_status: ["pending", "processing", "completed", "failed"],
+      post_type: [
+        "article",
+        "video",
+        "image_post",
+        "research_paper",
+        "discussion",
+      ],
       question_status: ["open", "voting", "closed", "removed"],
       question_type: [
         "problem",

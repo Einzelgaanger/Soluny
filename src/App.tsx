@@ -23,6 +23,9 @@ import VerifyPhone from "./pages/VerifyPhone";
 import Subscribe from "./pages/Subscribe";
 import UserProfile from "./pages/UserProfile";
 import Community from "./pages/Community";
+import Feed from "./pages/Feed";
+import NewPost from "./pages/NewPost";
+import PostDetail from "./pages/PostDetail";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +46,9 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard/feed" element={<Feed />} />
+              <Route path="/dashboard/feed/new" element={<NewPost />} />
+              <Route path="/dashboard/feed/:id" element={<PostDetail />} />
               <Route path="/dashboard/questions" element={<Questions />} />
               <Route path="/dashboard/questions/new" element={<NewQuestion />} />
               <Route path="/dashboard/questions/:id" element={<QuestionDetail />} />
