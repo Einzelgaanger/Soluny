@@ -7,21 +7,23 @@ const corsHeaders = {
 };
 
 /**
- * Earnings Distribution Engine v2
+ * Earnings Distribution Engine v3
  * 
- * - Takes a 12% platform fee (default) from the prize pool before distribution
- * - Users on higher subscription tiers get lower fees (5-15%)
- * - Distributes remaining pool among top-ranked answers by vote scores
- * - Awards 10 CP per KES 100 earned
- * - Enforces one answer per user per question (DB constraint)
+ * House-edge guardrails:
+ * - Platform fee: 5-15% based on question author's subscription tier
+ * - Minimum upvotes required: answer must have >= 3 upvotes (net_score >= 3) to qualify
+ * - Minimum question engagement: question must have >= 2 answers AND >= 10 views to distribute
+ * - Only positive net_score answers qualify
+ * - If no answers meet thresholds, prize pool is retained by the platform
  * 
  * Distribution tiers:
- * - 1 answer:  100% to #1
- * - 2 answers: 70% to #1, 30% to #2
- * - 3+ answers: 50% to #1, 30% to #2, 20% to #3
+ * - 1 qualifying answer:  100% to #1
+ * - 2 qualifying answers: 70% to #1, 30% to #2
+ * - 3+ qualifying answers: 50% to #1, 30% to #2, 20% to #3
+ * 
+ * CP reward: 10 CP per KES 100 earned
  */
 
-// Platform fee by subscription plan
 const PLATFORM_FEE: Record<string, number> = {
   free: 0.15,
   bronze: 0.12,
@@ -32,6 +34,11 @@ const PLATFORM_FEE: Record<string, number> = {
   annual: 0.10,
   institutional: 0.08,
 };
+
+// Minimum thresholds for reward eligibility
+const MIN_UPVOTES_FOR_REWARD = 3;       // Answer must have at least 3 net upvotes
+const MIN_ANSWERS_FOR_DISTRIBUTION = 2;  // Question must have at least 2 total answers
+const MIN_VIEWS_FOR_DISTRIBUTION = 10;   // Question must have at least 10 views
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,11 +54,10 @@ Deno.serve(async (req) => {
     const { question_id } = await req.json();
 
     if (!question_id) {
-      // Process all questions where voting has closed
       const now = new Date().toISOString();
       const { data: closedQuestions } = await adminClient
         .from("questions")
-        .select("id, prize_pool_kes")
+        .select("id, prize_pool_kes, answer_count, view_count")
         .eq("status", "voting")
         .lt("voting_closes_at", now);
 
@@ -64,7 +70,7 @@ Deno.serve(async (req) => {
 
       const results = [];
       for (const q of closedQuestions) {
-        const result = await distributeForQuestion(adminClient, q.id, Number(q.prize_pool_kes));
+        const result = await distributeForQuestion(adminClient, q.id, Number(q.prize_pool_kes), q.answer_count, q.view_count);
         results.push(result);
       }
 
@@ -74,10 +80,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Process single question
     const { data: question } = await adminClient
       .from("questions")
-      .select("id, prize_pool_kes, status")
+      .select("id, prize_pool_kes, status, answer_count, view_count")
       .eq("id", question_id)
       .single();
 
@@ -88,7 +93,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const result = await distributeForQuestion(adminClient, question.id, Number(question.prize_pool_kes));
+    const result = await distributeForQuestion(adminClient, question.id, Number(question.prize_pool_kes), question.answer_count, question.view_count);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -104,12 +109,29 @@ Deno.serve(async (req) => {
 async function distributeForQuestion(
   client: any,
   questionId: string,
-  prizePool: number
+  prizePool: number,
+  answerCount: number,
+  viewCount: number
 ) {
+  // ── Guard: minimum question engagement ──
+  if (answerCount < MIN_ANSWERS_FOR_DISTRIBUTION || viewCount < MIN_VIEWS_FOR_DISTRIBUTION) {
+    await client
+      .from("questions")
+      .update({ status: "closed" })
+      .eq("id", questionId);
+    return {
+      question_id: questionId,
+      distributed: 0,
+      platform_fee: prizePool, // Pool retained by platform
+      winners: 0,
+      reason: `Question did not meet minimum engagement (${answerCount} answers, ${viewCount} views). Requires at least ${MIN_ANSWERS_FOR_DISTRIBUTION} answers and ${MIN_VIEWS_FOR_DISTRIBUTION} views.`,
+    };
+  }
+
   // Get answers sorted by net_score desc
   const { data: answers } = await client
     .from("answers")
-    .select("id, author_id, net_score")
+    .select("id, author_id, net_score, upvotes")
     .eq("question_id", questionId)
     .order("net_score", { ascending: false });
 
@@ -118,28 +140,36 @@ async function distributeForQuestion(
       .from("questions")
       .update({ status: "closed" })
       .eq("id", questionId);
-    return { question_id: questionId, distributed: 0, platform_fee: 0, winners: 0 };
+    return { question_id: questionId, distributed: 0, platform_fee: prizePool, winners: 0, reason: "No answers submitted." };
   }
 
-  // Filter positive-score answers only
-  const eligible = answers.filter((a: any) => a.net_score > 0);
+  // ── Guard: minimum upvotes + positive score ──
+  const eligible = answers.filter(
+    (a: any) => a.net_score >= MIN_UPVOTES_FOR_REWARD && a.net_score > 0
+  );
 
   if (eligible.length === 0) {
     await client
       .from("questions")
       .update({ status: "closed" })
       .eq("id", questionId);
-    return { question_id: questionId, distributed: 0, platform_fee: 0, winners: 0 };
+    return {
+      question_id: questionId,
+      distributed: 0,
+      platform_fee: prizePool,
+      winners: 0,
+      reason: `No answers met the minimum ${MIN_UPVOTES_FOR_REWARD} upvotes threshold.`,
+    };
   }
 
-  // Calculate platform fee based on the question author's subscription
+  // Calculate platform fee
   const { data: questionData } = await client
     .from("questions")
     .select("author_id")
     .eq("id", questionId)
     .single();
 
-  let feeRate = 0.12; // default
+  let feeRate = 0.12;
   if (questionData) {
     const { data: authorProfile } = await client
       .from("profiles")
@@ -172,13 +202,11 @@ async function distributeForQuestion(
 
     if (earning <= 0) continue;
 
-    // Update answer with rank and earnings
     await client
       .from("answers")
       .update({ rank_position: i + 1, earnings_awarded_kes: earning })
       .eq("id", answer.id);
 
-    // Create earnings record
     await client.from("earnings").insert({
       user_id: answer.author_id,
       amount_kes: earning,
@@ -186,7 +214,6 @@ async function distributeForQuestion(
       payout_status: "pending",
     });
 
-    // Update user balance and total earnings
     const { data: profile } = await client
       .from("profiles")
       .select("available_balance_kes, total_earnings_kes, cp_balance")
@@ -194,9 +221,7 @@ async function distributeForQuestion(
       .single();
 
     if (profile) {
-      // CP reward: 10 CP per KES 100 earned
       const cpReward = Math.floor(earning / 100) * 10;
-
       await client
         .from("profiles")
         .update({
@@ -208,13 +233,12 @@ async function distributeForQuestion(
     }
   }
 
-  // Close question
   await client
     .from("questions")
     .update({ status: "closed" })
     .eq("id", questionId);
 
-  // Send email notifications to winners
+  // Notifications
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
@@ -236,7 +260,6 @@ async function distributeForQuestion(
     }
   }
 
-  // Send voting closed notification to question author
   try {
     await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
       method: "POST",

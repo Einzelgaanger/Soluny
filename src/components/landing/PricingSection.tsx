@@ -1,96 +1,74 @@
 import { Link } from "react-router-dom";
-import { Check, ShieldCheck, Zap, Activity, Cpu, Medal } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import pricingBg from "@/assets/pricing-bg.jpg";
 import { motion } from "framer-motion";
 
 const plans = [
   {
-    name: "STARTER",
-    icon: <Cpu className="h-5 w-5" />,
+    name: "Free",
     price: "0",
-    period: "FOREVER",
-    features: ["3 Daily Solutions", "5 Monthly Objectives", "15% Platform Overhead", "KES 500 Max Weekly Withdrawal"],
-    cta: "GET STARTED",
+    period: "forever",
+    features: ["3 answers per day", "5 questions per month", "15% platform fee", "KES 500 max weekly withdrawal"],
+    cta: "Get Started",
     highlight: false,
-    color: "text-muted-foreground",
   },
   {
-    name: "PROFESSIONAL",
-    icon: <Medal className="h-5 w-5 text-[#CD7F32]" />,
+    name: "Bronze",
     price: "499",
-    period: "/MO",
-    features: ["10 Daily Solutions", "15 Monthly Objectives", "12% Platform Overhead", "KES 5K Max Weekly Withdrawal"],
-    cta: "UPGRADE",
+    period: "/mo",
+    features: ["10 answers per day", "15 questions per month", "12% platform fee", "KES 5K max weekly withdrawal"],
+    cta: "Upgrade",
     highlight: false,
-    color: "text-[#CD7F32]",
   },
   {
-    name: "ADVANCED",
-    icon: <Medal className="h-5 w-5 text-slate-300" />,
+    name: "Silver",
     price: "999",
-    period: "/MO",
-    features: ["25 Daily Solutions", "Unlimited Objectives", "10% Platform Overhead", "KES 25K Max Weekly Withdrawal", "Priority Support"],
-    cta: "GO PRO",
+    period: "/mo",
+    features: ["25 answers per day", "Unlimited questions", "10% platform fee", "KES 25K max weekly withdrawal", "Priority support"],
+    cta: "Go Silver",
     highlight: false,
-    color: "text-slate-300",
   },
   {
-    name: "ELITE",
-    icon: <Medal className="h-5 w-5 text-primary" />,
+    name: "Gold",
     price: "2,499",
-    period: "/MO",
-    features: ["50 Daily Solutions", "Unlimited Objectives", "8% Platform Overhead", "KES 100K Max Weekly Withdrawal", "Elite Member Badge", "1.5x Reward Multiplier"],
-    cta: "JOIN ELITE",
+    period: "/mo",
+    features: ["50 answers per day", "Unlimited questions", "8% platform fee", "KES 100K max weekly withdrawal", "Gold badge", "1.5x reward multiplier"],
+    cta: "Go Gold",
     highlight: true,
-    color: "text-primary",
   },
   {
-    name: "ULTIMATE",
-    icon: <ShieldCheck className="h-5 w-5 text-info" />,
+    name: "Platinum",
     price: "4,999",
-    period: "/MO",
-    features: ["Unlimited Solutions", "Unlimited Objectives", "5% Platform Overhead", "Unlimited Withdrawal", "Ultimate Member Badge", "2x Reward Multiplier", "Featured Contributor Profile"],
-    cta: "CHOOSE ULTIMATE",
+    period: "/mo",
+    features: ["Unlimited answers", "Unlimited questions", "5% platform fee", "Unlimited withdrawal", "Platinum badge", "2x reward multiplier", "Featured profile"],
+    cta: "Go Platinum",
     highlight: false,
-    color: "text-info",
   },
 ];
 
 const PricingSection = () => {
   return (
     <section id="pricing" className="py-24 sm:py-32 relative overflow-hidden">
-      {/* Cinematic Background */}
       <div className="absolute inset-0 z-0">
-        <img src={pricingBg} alt="" className="w-full h-full object-cover opacity-20" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/75 to-background" />
+        <img src={pricingBg} alt="" className="w-full h-full object-cover opacity-15" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background" />
       </div>
-      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
 
       <div className="container px-4 sm:px-6 relative z-10">
         <motion.div
-          initial={{ clipPath: "inset(0 100% 0 0)" }}
-          whileInView={{ clipPath: "inset(0 0% 0 0)" }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-          className="text-center mb-20 relative"
+          transition={{ duration: 0.8 }}
+          className="text-center mb-16"
         >
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 text-tactical opacity-20 whitespace-nowrap">
-            PLATFORM_PLANS // SYS_PRICING_DEPLO // SECURE_LINK
-          </div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary mb-6"
-          >
-            <Activity className="h-3 w-3 animate-pulse" />
-            <span className="text-[10px] font-orbitron font-black tracking-[0.3em]">SUBSCRIPTION_MODELS</span>
-          </motion.div>
-          <h2 className="text-5xl sm:text-7xl lg:text-8xl font-black font-orbitron tracking-tighter mb-6 uppercase italic">
-            CHOOSE YOUR <span className="text-gradient-gold">PLAN</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-primary mb-4 block">Pricing</span>
+          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-4">
+            Choose Your <span className="text-primary">Plan</span>
           </h2>
-          <p className="text-2xl font-serif italic text-muted-foreground/60 max-w-2xl mx-auto leading-relaxed">
-            Maximize your <span className="text-foreground tracking-widest font-orbitron font-bold text-sm uppercase not-italic">performance</span>. Select the membership level that fits your goals.
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            Start free and upgrade as you grow. Higher plans mean lower fees, more answers, and bigger withdrawals.
           </p>
         </motion.div>
 
@@ -101,69 +79,51 @@ const PricingSection = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              whileHover={{ y: -10 }}
-              className={`flex flex-col relative group h-full ${p.highlight ? "z-20 lg:scale-105" : "z-10"
-                }`}
+              transition={{ delay: i * 0.08 }}
+              whileHover={{ y: -6 }}
+              className={`flex flex-col relative group ${p.highlight ? "z-20 lg:scale-105" : "z-10"}`}
             >
-              <div className={`flex flex-col p-6 rounded-2xl bg-background/40 backdrop-blur-xl border-2 h-full transition-all duration-300 hud-corners overflow-hidden relative ${p.highlight
-                ? "border-primary glow-gold-strong shadow-primary/20"
-                : "border-primary/10 group-hover:border-primary/40"
-                }`}>
-
-                {/* Background Scanning Effect */}
-                <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 -translate-y-full group-hover:animate-scanning-bar pointer-events-none" />
-
+              <div className={`flex flex-col p-6 rounded-2xl bg-background/60 backdrop-blur-xl border-2 h-full transition-all duration-300 ${
+                p.highlight
+                  ? "border-primary glow-gold shadow-primary/20"
+                  : "border-border/30 group-hover:border-primary/30"
+              }`}>
                 {p.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-primary-foreground font-orbitron font-black text-[10px] tracking-widest rounded-full z-20 shadow-lg">
-                    RECOMMENDED
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-primary-foreground font-bold text-[10px] tracking-wider rounded-full z-20 shadow-lg uppercase">
+                    Most Popular
                   </div>
                 )}
 
-                <div className="flex items-center justify-between mb-6 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-primary/10 ${p.color}`}>
-                      {p.icon}
-                    </div>
-                    <h3 className={`text-xs font-black font-orbitron tracking-tight ${p.color}`}>{p.name}</h3>
-                  </div>
-                  <span className="text-tactical scale-75 opacity-20">TIER_0{i + 1}</span>
+                <div className="mb-4">
+                  <h3 className={`text-sm font-bold ${p.highlight ? "text-primary" : "text-foreground"}`}>{p.name}</h3>
                 </div>
 
-                <div className="flex items-baseline gap-1 mb-6 border-b border-primary/10 pb-6 relative z-10">
-                  <span className="text-[10px] font-rajdhani font-bold text-muted-foreground mr-1">KES</span>
-                  <span className="text-4xl font-orbitron font-black text-foreground">{p.price}</span>
-                  <div className="flex flex-col ml-1">
-                    <span className="text-[10px] font-rajdhani font-bold text-muted-foreground uppercase leading-none">{p.period}</span>
-                    <span className="text-tactical scale-[0.6] opacity-30">FIXED_RATE</span>
-                  </div>
+                <div className="flex items-baseline gap-1 mb-6 border-b border-border/20 pb-6">
+                  <span className="text-xs text-muted-foreground mr-1">KES</span>
+                  <span className="text-4xl font-black text-foreground">{p.price}</span>
+                  <span className="text-xs text-muted-foreground">{p.period}</span>
                 </div>
 
-                <ul className="space-y-4 flex-1 mb-8 relative z-10">
+                <ul className="space-y-3 flex-1 mb-6">
                   {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-3 group/item">
-                      <Zap className={`h-3 w-3 mt-1 shrink-0 ${p.highlight ? "text-primary animate-pulse" : "text-primary/30 group-hover/item:text-primary transition-colors"}`} />
-                      <span className="text-[11px] font-rajdhani font-bold text-muted-foreground leading-tight">{f}</span>
+                    <li key={f} className="flex items-start gap-2.5">
+                      <Check className={`h-4 w-4 mt-0.5 shrink-0 ${p.highlight ? "text-primary" : "text-muted-foreground"}`} />
+                      <span className="text-sm text-muted-foreground">{f}</span>
                     </li>
                   ))}
                 </ul>
 
-                <div className="relative z-10">
-                  <Link to="/signup">
-                    <Button
-                      className={`w-full font-orbitron font-black text-[11px] tracking-widest rounded-xl py-6 border-2 transition-all duration-300 ${p.highlight
-                        ? "bg-primary text-primary-foreground border-primary glow-gold hover:scale-105 active:scale-95"
-                        : "bg-transparent text-foreground border-primary/20 hover:border-primary hover:bg-primary/10"
-                        }`}
-                    >
-                      {p.cta}
-                    </Button>
-                  </Link>
-                  <div className="mt-4 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-tactical opacity-40">SYSTEM_READY</span>
-                    <span className="text-tactical opacity-40">#00{i + 1}</span>
-                  </div>
-                </div>
+                <Link to="/signup">
+                  <Button
+                    className={`w-full font-bold text-sm rounded-xl py-5 transition-all ${
+                      p.highlight
+                        ? "bg-primary text-primary-foreground border border-primary glow-gold hover:scale-105 active:scale-95"
+                        : "bg-transparent text-foreground border border-border/40 hover:border-primary hover:bg-primary/10"
+                    }`}
+                  >
+                    {p.cta}
+                  </Button>
+                </Link>
               </div>
             </motion.div>
           ))}
@@ -172,6 +132,5 @@ const PricingSection = () => {
     </section>
   );
 };
-
 
 export default PricingSection;
