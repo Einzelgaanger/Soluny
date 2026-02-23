@@ -702,7 +702,7 @@ const Community = () => {
     if (chatUserId) {
       return (
         <DashboardLayout>
-          <div className="animate-fade-in fixed inset-0 z-40 bg-background flex flex-col md:relative md:inset-auto md:z-auto" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+          <div className="animate-fade-in fixed inset-0 z-[60] bg-background flex flex-col md:relative md:inset-auto md:z-auto" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
             <ChatView recipientId={chatUserId} onBack={closeChat} onlineIds={onlineIds} />
           </div>
         </DashboardLayout>
