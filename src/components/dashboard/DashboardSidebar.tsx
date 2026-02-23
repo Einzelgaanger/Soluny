@@ -1,7 +1,6 @@
 import { useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
-  MessageSquareText,
   Trophy,
   Wallet,
   User,
@@ -29,7 +28,6 @@ const DashboardSidebar = ({ collapsed, onToggle }: { collapsed: boolean; onToggl
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", badge: 0, exact: true },
     { icon: BookOpen, label: "Feed", path: "/dashboard/feed", badge: 0, exact: false },
-    { icon: MessageSquareText, label: "Questions", path: "/dashboard/questions", badge: 0, exact: false },
     { icon: Users, label: "Community", path: "/dashboard/community", badge: unreadCount, exact: false },
     { icon: Trophy, label: "Leaderboard", path: "/dashboard/leaderboard", badge: 0, exact: false },
     { icon: Wallet, label: "Earnings", path: "/dashboard/earnings", badge: 0, exact: false },
